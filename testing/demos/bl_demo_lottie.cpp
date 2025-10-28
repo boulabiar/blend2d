@@ -171,11 +171,11 @@ private:
 
   void updateTitle() {
     QString name = _current_path.isEmpty() ? QStringLiteral("None") : QFileInfo(_current_path).fileName();
-    QString title = QStringLiteral("Lottie Demo | %1 | Frame %.1f | Render %.2f ms | FPS %.1f")
+    QString title = QStringLiteral("Lottie Demo | %1 | Frame %2 | Render %3 ms | FPS %4")
       .arg(name)
       .arg(_current_frame, 0, 'f', 1)
-      .arg(_canvas.average_render_time())
-      .arg(_canvas.fps());
+      .arg(_canvas.average_render_time(), 0, 'f', 2)
+      .arg(_canvas.fps(), 0, 'f', 1);
     if (title != windowTitle())
       setWindowTitle(title);
   }
