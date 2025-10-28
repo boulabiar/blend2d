@@ -262,6 +262,47 @@ std::unique_ptr<LottieShapePath> parse_shape_path(const QJsonObject& obj) {
   return path;
 }
 
+std::unique_ptr<LottieShapePath> parse_rectangle(const QJsonObject& obj) {
+  QJsonObject posObj = obj.value(QLatin1String("p")).toObject();
+  QJsonObject sizeObj = obj.value(QLatin1String("s")).toObject();
+  QJsonObject radiusObj = obj.value(QLatin1String("r")).toObject();
+
+  if (posObj.value(QLatin1String("a")).toInt() != 0)
+    return nullptr;
+  if (sizeObj.value(QLatin1String("a")).toInt() != 0)
+    return nullptr;
+  if (radiusObj.value(QLatin1String("a")).toInt() != 0)
+    return nullptr;
+
+  QJsonArray posArr = posObj.value(QLatin1String("k")).toArray();
+  QJsonArray sizeArr = sizeObj.value(QLatin1String("k")).toArray();
+  if (posArr.size() < 2 || sizeArr.size() < 2)
+    return nullptr;
+
+  double px = posArr.at(0).toDouble();
+  double py = posArr.at(1).toDouble();
+  double sx = sizeArr.at(0).toDouble();
+  double sy = sizeArr.at(1).toDouble();
+  double radius = radiusObj.value(QLatin1String("k")).toDouble(0.0);
+
+  double x = px - sx * 0.5;
+  double y = py - sy * 0.5;
+
+  auto path = std::make_unique<LottieShapePath>();
+  BLGeometryDirection direction = obj.value(QLatin1String("d")).toInt(1) == 1 ? BL_GEOMETRY_DIRECTION_CW : BL_GEOMETRY_DIRECTION_CCW;
+
+  if (radius <= 0.0) {
+    path->path.add_rect(x, y, sx, sy, direction);
+  }
+  else {
+    double clamped = std::min(radius, std::min(std::abs(sx), std::abs(sy)) * 0.5);
+    BLRoundRect rr(x, y, sx, sy, clamped, clamped);
+    path->path.add_round_rect(rr, direction);
+  }
+
+  return path;
+}
+
 std::unique_ptr<LottieFill> parse_fill(const QJsonObject& obj) {
   auto fill = std::make_unique<LottieFill>();
   parse_animated_color(obj.value(QLatin1String("c")), fill->color, LottieColor{0.0, 0.0, 0.0, 1.0});
@@ -292,6 +333,9 @@ std::unique_ptr<LottieNode> parse_shape_item(const QJsonObject& obj) {
 
   if (type == QLatin1String("sh"))
     return parse_shape_path(obj);
+
+  if (type == QLatin1String("rc"))
+    return parse_rectangle(obj);
 
   if (type == QLatin1String("fl"))
     return parse_fill(obj);
