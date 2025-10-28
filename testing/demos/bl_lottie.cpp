@@ -303,6 +303,32 @@ std::unique_ptr<LottieShapePath> parse_rectangle(const QJsonObject& obj) {
   return path;
 }
 
+std::unique_ptr<LottieShapePath> parse_ellipse(const QJsonObject& obj) {
+  QJsonObject posObj = obj.value(QLatin1String("p")).toObject();
+  QJsonObject sizeObj = obj.value(QLatin1String("s")).toObject();
+
+  if (posObj.value(QLatin1String("a")).toInt() != 0)
+    return nullptr;
+  if (sizeObj.value(QLatin1String("a")).toInt() != 0)
+    return nullptr;
+
+  QJsonArray posArr = posObj.value(QLatin1String("k")).toArray();
+  QJsonArray sizeArr = sizeObj.value(QLatin1String("k")).toArray();
+  if (posArr.size() < 2 || sizeArr.size() < 2)
+    return nullptr;
+
+  double cx = posArr.at(0).toDouble();
+  double cy = posArr.at(1).toDouble();
+  double rx = sizeArr.at(0).toDouble() * 0.5;
+  double ry = sizeArr.at(1).toDouble() * 0.5;
+
+  auto path = std::make_unique<LottieShapePath>();
+  BLGeometryDirection direction = obj.value(QLatin1String("d")).toInt(1) == 1 ? BL_GEOMETRY_DIRECTION_CW : BL_GEOMETRY_DIRECTION_CCW;
+  path->path.add_ellipse(BLEllipse(cx, cy, rx, ry), direction);
+
+  return path;
+}
+
 std::unique_ptr<LottieFill> parse_fill(const QJsonObject& obj) {
   auto fill = std::make_unique<LottieFill>();
   parse_animated_color(obj.value(QLatin1String("c")), fill->color, LottieColor{0.0, 0.0, 0.0, 1.0});
@@ -336,6 +362,9 @@ std::unique_ptr<LottieNode> parse_shape_item(const QJsonObject& obj) {
 
   if (type == QLatin1String("rc"))
     return parse_rectangle(obj);
+
+  if (type == QLatin1String("el"))
+    return parse_ellipse(obj);
 
   if (type == QLatin1String("fl"))
     return parse_fill(obj);
@@ -657,7 +686,8 @@ void LottieComposition::render(BLContext& ctx, double frame, const BLMatrix2D& r
   if (_layers.empty())
     return;
 
-  for (const LottieLayer& layer : _layers) {
+  for (auto it = _layers.rbegin(); it != _layers.rend(); ++it) {
+    const LottieLayer& layer = *it;
     if (!layer.root)
       continue;
 
