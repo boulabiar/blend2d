@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 BLMatrix2D lottie_matrix_multiply(const BLMatrix2D& a, const BLMatrix2D& b) noexcept {
   BLMatrix2D result;
@@ -435,75 +436,6 @@ BLStrokeJoin map_stroke_join(int join) noexcept {
 
 void render_group(const LottieGroup& group, BLContext& ctx, double frame, const BLMatrix2D& parent_matrix, double opacity);
 
-void render_fill(const LottieFill& fill,
-                 BLContext& ctx,
-                 double frame,
-                 const BLMatrix2D& matrix,
-                 double opacity,
-                 const std::vector<const LottieShapePath*>& paths) {
-  if (paths.empty())
-    return;
-
-  double style_opacity = fill.opacity.evaluate(frame) * 0.01;
-  double final_opacity = opacity * style_opacity;
-  if (final_opacity <= 0.0)
-    return;
-
-  BLFillRule rule = fill.fill_rule == 2 ? BL_FILL_RULE_EVEN_ODD : BL_FILL_RULE_NON_ZERO;
-  ctx.set_fill_rule(rule);
-
-  LottieColor color = fill.color.evaluate(frame);
-  BLRgba32 rgba = make_rgba32(color, final_opacity);
-
-  BLPath combined;
-  for (const LottieShapePath* path : paths) {
-    if (!path)
-      continue;
-    BLPath transformed(path->path);
-    transformed.transform(matrix);
-    combined.add_path(transformed);
-  }
-
-  if (!combined.is_empty())
-    ctx.fill_path(combined, rgba);
-}
-
-void render_stroke(const LottieStroke& stroke,
-                   BLContext& ctx,
-                   double frame,
-                   const BLMatrix2D& matrix,
-                   double opacity,
-                   const std::vector<const LottieShapePath*>& paths) {
-  if (paths.empty())
-    return;
-
-  double style_opacity = stroke.opacity.evaluate(frame) * 0.01;
-  double final_opacity = opacity * style_opacity;
-  if (final_opacity <= 0.0)
-    return;
-
-  double width = stroke.width.evaluate(frame);
-  ctx.set_stroke_width(width);
-  ctx.set_stroke_caps(map_stroke_cap(stroke.cap));
-  ctx.set_stroke_join(map_stroke_join(stroke.join));
-  ctx.set_stroke_miter_limit(stroke.miter_limit);
-
-  LottieColor color = stroke.color.evaluate(frame);
-  BLRgba32 rgba = make_rgba32(color, final_opacity);
-
-  BLPath combined;
-  for (const LottieShapePath* path : paths) {
-    if (!path)
-      continue;
-    BLPath transformed(path->path);
-    transformed.transform(matrix);
-    combined.add_path(transformed);
-  }
-
-  if (!combined.is_empty())
-    ctx.stroke_path(combined, rgba);
-}
-
 void render_group(const LottieGroup& group, BLContext& ctx, double frame, const BLMatrix2D& parent_matrix, double opacity) {
   double local_opacity = opacity * group.transform.opacity_at(frame);
   if (local_opacity <= 0.0)
@@ -514,11 +446,66 @@ void render_group(const LottieGroup& group, BLContext& ctx, double frame, const 
   path_stack.reserve(8);
   bool path_consumed = false;
 
+  struct DrawCommand {
+    enum Type { kGroup, kFill, kStroke } type;
+
+    const LottieGroup* group {};
+    BLMatrix2D matrix {};
+    double opacity {};
+
+    BLPath path {};
+    BLFillRule fill_rule {BL_FILL_RULE_NON_ZERO};
+    BLRgba32 color {};
+
+    double stroke_width {};
+    BLStrokeCap stroke_cap {BL_STROKE_CAP_BUTT};
+    BLStrokeJoin stroke_join {BL_STROKE_JOIN_MITER_CLIP};
+    double miter_limit {};
+  };
+
+  std::vector<DrawCommand> commands;
+  commands.reserve(group.children.size());
+
+  auto emit_group_command = [&](const LottieGroup& child_group) {
+    DrawCommand cmd;
+    cmd.type = DrawCommand::kGroup;
+    cmd.group = &child_group;
+    cmd.matrix = matrix;
+    cmd.opacity = local_opacity;
+    commands.push_back(std::move(cmd));
+  };
+
+  auto emit_fill_command = [&](const LottieFill& fill, const BLPath& combined, BLFillRule rule, BLRgba32 rgba) {
+    DrawCommand cmd;
+    cmd.type = DrawCommand::kFill;
+    cmd.path = combined;
+    cmd.fill_rule = rule;
+    cmd.color = rgba;
+    commands.push_back(std::move(cmd));
+  };
+
+  auto emit_stroke_command = [&](const LottieStroke& stroke, const BLPath& combined, BLRgba32 rgba, double width, BLStrokeCap cap, BLStrokeJoin join, double miter_limit) {
+    DrawCommand cmd;
+    cmd.type = DrawCommand::kStroke;
+    cmd.path = combined;
+    cmd.color = rgba;
+    cmd.stroke_width = width;
+    cmd.stroke_cap = cap;
+    cmd.stroke_join = join;
+    cmd.miter_limit = miter_limit;
+    commands.push_back(std::move(cmd));
+  };
+
   for (const auto& child : group.children) {
     switch (child->type) {
-      case LottieNode::kGroup:
-        render_group(static_cast<const LottieGroup&>(*child), ctx, frame, matrix, local_opacity);
+      case LottieNode::kGroup: {
+        if (!path_stack.empty()) {
+          path_stack.clear();
+          path_consumed = false;
+        }
+        emit_group_command(static_cast<const LottieGroup&>(*child));
         break;
+      }
 
       case LottieNode::kPath:
         if (path_consumed && !path_stack.empty()) {
@@ -528,14 +515,80 @@ void render_group(const LottieGroup& group, BLContext& ctx, double frame, const 
         path_stack.push_back(static_cast<const LottieShapePath*>(child.get()));
         break;
 
-      case LottieNode::kFill:
-        render_fill(static_cast<const LottieFill&>(*child), ctx, frame, matrix, local_opacity, path_stack);
+      case LottieNode::kFill: {
+        const LottieFill& fill = static_cast<const LottieFill&>(*child);
+        double style_opacity = fill.opacity.evaluate(frame) * 0.01;
+        double final_opacity = local_opacity * style_opacity;
+        if (final_opacity > 0.0 && !path_stack.empty()) {
+          LottieColor color = fill.color.evaluate(frame);
+          BLRgba32 rgba = make_rgba32(color, final_opacity);
+          BLFillRule rule = fill.fill_rule == 2 ? BL_FILL_RULE_EVEN_ODD : BL_FILL_RULE_NON_ZERO;
+
+          BLPath combined;
+          for (const LottieShapePath* path : path_stack) {
+            if (!path)
+              continue;
+            BLPath transformed(path->path);
+            transformed.transform(matrix);
+            combined.add_path(transformed);
+          }
+
+          if (!combined.is_empty())
+            emit_fill_command(fill, combined, rule, rgba);
+        }
         path_consumed = true;
         break;
+      }
 
-      case LottieNode::kStroke:
-        render_stroke(static_cast<const LottieStroke&>(*child), ctx, frame, matrix, local_opacity, path_stack);
+      case LottieNode::kStroke: {
+        const LottieStroke& stroke = static_cast<const LottieStroke&>(*child);
+        double style_opacity = stroke.opacity.evaluate(frame) * 0.01;
+        double final_opacity = local_opacity * style_opacity;
+        if (final_opacity > 0.0 && !path_stack.empty()) {
+          double width = stroke.width.evaluate(frame);
+          BLStrokeCap cap = map_stroke_cap(stroke.cap);
+          BLStrokeJoin join = map_stroke_join(stroke.join);
+          double miter_limit = stroke.miter_limit;
+
+          LottieColor color = stroke.color.evaluate(frame);
+          BLRgba32 rgba = make_rgba32(color, final_opacity);
+
+          BLPath combined;
+          for (const LottieShapePath* path : path_stack) {
+            if (!path)
+              continue;
+            BLPath transformed(path->path);
+            transformed.transform(matrix);
+            combined.add_path(transformed);
+          }
+
+          if (!combined.is_empty())
+            emit_stroke_command(stroke, combined, rgba, width, cap, join, miter_limit);
+        }
         path_consumed = true;
+        break;
+      }
+    }
+  }
+
+  for (auto it = commands.rbegin(); it != commands.rend(); ++it) {
+    const DrawCommand& cmd = *it;
+    switch (cmd.type) {
+      case DrawCommand::kGroup:
+        render_group(*cmd.group, ctx, frame, cmd.matrix, cmd.opacity);
+        break;
+
+      case DrawCommand::kFill:
+        ctx.set_fill_rule(cmd.fill_rule);
+        ctx.fill_path(cmd.path, cmd.color);
+        break;
+
+      case DrawCommand::kStroke:
+        ctx.set_stroke_width(cmd.stroke_width);
+        ctx.set_stroke_caps(cmd.stroke_cap);
+        ctx.set_stroke_join(cmd.stroke_join);
+        ctx.set_stroke_miter_limit(cmd.miter_limit);
+        ctx.stroke_path(cmd.path, cmd.color);
         break;
     }
   }
