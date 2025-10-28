@@ -1238,13 +1238,21 @@ if (BLEND2D_DEMOS)
                 bl_demo_sprites
                 bl_demo_stroke
                 bl_demo_text
-                bl_demo_tiger)
+                bl_demo_tiger
+                bl_demo_lottie)
+      set(extra_sources)
+      if (app STREQUAL "bl_demo_lottie")
+        list(APPEND extra_sources
+          testing/demos/bl_lottie.cpp
+          testing/demos/bl_lottie.h)
+      endif()
       blend2d_add_target(${app} EXECUTABLE_WIN32
         SOURCES
           testing/demos/${app}.cpp
           testing/demos/bl_qt_canvas.cpp
           testing/demos/bl_qt_canvas.h
           testing/demos/bl_qt_headers.h
+          ${extra_sources}
         LIBRARIES
           blend2d::blend2d Qt6::Gui Qt6::Widgets)
       set_property(TARGET ${app} PROPERTY AUTOMOC TRUE)
