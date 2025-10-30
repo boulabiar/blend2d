@@ -2042,10 +2042,6 @@ void LottieComposition::render_layer_array(const std::vector<LottieLayer>& layer
       return opacity_cache[index];
 
     double value = layers[index].transform.opacity_at(frame);
-    const int parent = layers[index].parent;
-    if (parent >= 0)
-      value *= resolve_opacity(size_t(parent));
-
     if (value < 0.0) value = 0.0;
     if (value > 1.0) value = 1.0;
 
