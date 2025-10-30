@@ -191,6 +191,7 @@ struct LottieMask {
   Mode mode {kAdd};
   bool inverted {};
   LottieAnimatedValue<double> opacity;
+  LottieAnimatedValue<double> expansion;
   LottieShapePath path;
 };
 

@@ -824,6 +824,7 @@ bool parse_mask(const QJsonObject& obj, LottieMask& dst) {
 
   dst.inverted = obj.value(QLatin1String("inv")).toBool(false);
   parse_animated_double(obj.value(QLatin1String("o")), dst.opacity, 100.0);
+  parse_animated_double(obj.value(QLatin1String("x")), dst.expansion, 0.0);
 
   const QJsonObject pt = obj.value(QLatin1String("pt")).toObject();
   if (pt.isEmpty())
@@ -1555,11 +1556,40 @@ void LottieComposition::render_layer_content(const LottieLayer& layer,
         if (mask_path_source.is_empty())
           continue;
 
-        BLPath mask_path(mask_path_source);
-        mask_path.transform(layer_matrix);
+        const double expansion = mask.expansion.evaluate(frame);
+        const double stroke_width = std::abs(expansion);
 
         const uint32_t alpha_byte = uint32_t(std::round(mask_opacity * 255.0));
-        mask_ctx.set_fill_style(BLRgba32(255, 255, 255, alpha_byte));
+        const BLRgba32 mask_color(255, 255, 255, alpha_byte);
+
+        BLImage mask_shape;
+        if (mask_shape.create(canvas_width, canvas_height, BL_FORMAT_PRGB32) != BL_SUCCESS)
+          continue;
+
+        {
+          BLContext shape_ctx(mask_shape);
+          shape_ctx.clear_all();
+          shape_ctx.save();
+          shape_ctx.apply_transform(layer_matrix);
+          shape_ctx.set_comp_op(BL_COMP_OP_SRC_COPY);
+          shape_ctx.fill_path(mask_path_source, mask_color);
+
+          if (stroke_width > 0.0) {
+            shape_ctx.set_stroke_style(mask_color);
+            shape_ctx.set_stroke_caps(BL_STROKE_CAP_ROUND);
+            shape_ctx.set_stroke_join(BL_STROKE_JOIN_ROUND);
+            shape_ctx.set_stroke_width(stroke_width);
+            if (expansion > 0.0) {
+              shape_ctx.set_comp_op(BL_COMP_OP_SRC_OVER);
+              shape_ctx.stroke_path(mask_path_source);
+            }
+            else {
+              shape_ctx.set_comp_op(BL_COMP_OP_DST_OUT);
+              shape_ctx.stroke_path(mask_path_source);
+            }
+          }
+          shape_ctx.restore();
+        }
 
         switch (mask.mode) {
           case LottieMask::kAdd: {
@@ -1601,7 +1631,7 @@ void LottieComposition::render_layer_content(const LottieLayer& layer,
             continue;
         }
 
-        mask_ctx.fill_path(mask_path);
+        mask_ctx.blit_image(BLPoint(0, 0), mask_shape);
         mask_applied = true;
       }
     }
