@@ -2207,6 +2207,10 @@ bool LottieComposition::load_from_file(const QString& path, QString* error_messa
       layer.matte_mode = 0;
       layer.in_point = layerObj.value(QLatin1String("ip")).toDouble(_in_point);
       layer.out_point = layerObj.value(QLatin1String("op")).toDouble(_out_point);
+      layer.start_time = layerObj.value(QLatin1String("st")).toDouble(0.0);
+      layer.time_stretch = layerObj.value(QLatin1String("sr")).toDouble(1.0);
+      if (!std::isfinite(layer.time_stretch) || layer.time_stretch == 0.0)
+        layer.time_stretch = 1.0;
       parse_transform_object(layerObj.value(QLatin1String("ks")).toObject(), layer.transform);
 
       const QJsonArray masks_array = layerObj.value(QLatin1String("masksProperties")).toArray();
@@ -2368,6 +2372,16 @@ void LottieComposition::render_layer_array(const std::vector<LottieLayer>& layer
     return value;
   };
 
+  auto sample_frame_for = [&](const LottieLayer& layer) -> double {
+    double stretch = layer.time_stretch;
+    if (!std::isfinite(stretch) || stretch == 0.0)
+      stretch = 1.0;
+    double local = (frame - layer.start_time) / stretch;
+    if (!std::isfinite(local))
+      local = frame;
+    return local;
+  };
+
   for (size_t i = layers.size(); i-- > 0;) {
     const LottieLayer& layer = layers[i];
     const bool has_vector = layer.root != nullptr;
@@ -2404,20 +2418,28 @@ void LottieComposition::render_layer_array(const std::vector<LottieLayer>& layer
 
       auto render_to_image = [&](const LottieLayer& srcLayer,
                                  const BLMatrix2D& matrix,
-                                 double op) -> BLImage {
+                                 double op,
+                                 double src_frame) -> BLImage {
         BLImage img;
         if (img.create(canvas_width, canvas_height, BL_FORMAT_PRGB32) != BL_SUCCESS)
           return img;
         {
           BLContext imgCtx(img);
           imgCtx.clear_all();
-          render_layer_content(srcLayer, imgCtx, frame, matrix, op);
+          render_layer_content(srcLayer, imgCtx, src_frame, matrix, op);
         }
         return img;
       };
 
-      const BLImage matte_image = render_to_image(matte_layer, matte_matrix, matte_opacity);
-      BLImage content_image = render_to_image(layer, layer_matrix, layer_opacity);
+      const double matte_frame = (matte_layer.precomp_index >= 0)
+        ? sample_frame_for(matte_layer)
+        : frame;
+      const double content_frame = (layer.precomp_index >= 0)
+        ? sample_frame_for(layer)
+        : frame;
+
+      const BLImage matte_image = render_to_image(matte_layer, matte_matrix, matte_opacity, matte_frame);
+      BLImage content_image = render_to_image(layer, layer_matrix, layer_opacity, content_frame);
 
       if (matte_image && content_image) {
         ctx.save();
@@ -2435,7 +2457,10 @@ void LottieComposition::render_layer_array(const std::vector<LottieLayer>& layer
 
     ctx.save();
     apply_layer_blend_mode(ctx, layer.blend_mode);
-    render_layer_content(layer, ctx, frame, layer_matrix, layer_opacity);
+    const double eval_frame = (layer.precomp_index >= 0)
+      ? sample_frame_for(layer)
+      : frame;
+    render_layer_content(layer, ctx, eval_frame, layer_matrix, layer_opacity);
     ctx.restore();
   }
 }
