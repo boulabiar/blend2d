@@ -201,10 +201,43 @@ void parse_transform_object(const QJsonObject& obj, LottieTransform& transform) 
 
 std::unique_ptr<LottieShapePath> parse_shape_path(const QJsonObject& obj) {
   QJsonObject ks = obj.value(QLatin1String("ks")).toObject();
-  if (ks.value(QLatin1String("a")).toInt() != 0)
+
+  auto extract_path_object = [](const QJsonValue& value) -> QJsonObject {
+    if (value.isObject())
+      return value.toObject();
+
+    if (value.isArray()) {
+      QJsonArray arr = value.toArray();
+      if (!arr.isEmpty() && arr.first().isObject())
+        return arr.first().toObject();
+    }
+
+    return QJsonObject();
+  };
+
+  QJsonObject data;
+  int animated = ks.value(QLatin1String("a")).toInt();
+  if (!animated) {
+    data = extract_path_object(ks.value(QLatin1String("k")));
+  }
+  else {
+    QJsonArray frames = ks.value(QLatin1String("k")).toArray();
+    for (const QJsonValue& entry : frames) {
+      if (!entry.isObject())
+        continue;
+      QJsonObject key = entry.toObject();
+      QJsonArray shapes = key.value(QLatin1String("s")).toArray();
+      if (shapes.isEmpty())
+        continue;
+      data = extract_path_object(shapes.first());
+      if (!data.isEmpty())
+        break;
+    }
+  }
+
+  if (data.isEmpty())
     return nullptr;
 
-  QJsonObject data = ks.value(QLatin1String("k")).toObject();
   QJsonArray vertices = data.value(QLatin1String("v")).toArray();
   QJsonArray in_tangents = data.value(QLatin1String("i")).toArray();
   QJsonArray out_tangents = data.value(QLatin1String("o")).toArray();
@@ -330,6 +363,121 @@ std::unique_ptr<LottieShapePath> parse_ellipse(const QJsonObject& obj) {
   return path;
 }
 
+std::unique_ptr<LottieGradientFill> parse_gradient_fill(const QJsonObject& obj) {
+  auto fill = std::make_unique<LottieGradientFill>();
+  fill->gradient_type = obj.value(QLatin1String("t")).toInt(1);
+  fill->fill_rule = obj.value(QLatin1String("r")).toInt(1);
+
+  parse_animated_vec2(obj.value(QLatin1String("s")), fill->start, LottieVec2{0.0, 0.0});
+  parse_animated_vec2(obj.value(QLatin1String("e")), fill->end, LottieVec2{0.0, 0.0});
+  parse_animated_double(obj.value(QLatin1String("o")), fill->opacity, 100.0);
+
+  QJsonObject grad = obj.value(QLatin1String("g")).toObject();
+  int stop_count = grad.value(QLatin1String("p")).toInt();
+  QJsonValue stops_value = grad.value(QLatin1String("k"));
+
+  auto extract_gradient_values = [](const QJsonValue& value) -> QJsonArray {
+    if (value.isObject()) {
+      QJsonObject obj = value.toObject();
+      if (obj.value(QLatin1String("a")).toInt() == 0)
+        return obj.value(QLatin1String("k")).toArray();
+
+      QJsonArray frames = obj.value(QLatin1String("k")).toArray();
+      for (const QJsonValue& frameValue : frames) {
+        if (!frameValue.isObject())
+          continue;
+        QJsonObject frameObj = frameValue.toObject();
+        QJsonArray components = frameObj.value(QLatin1String("s")).toArray();
+        if (!components.isEmpty() && components.first().isArray())
+          return components.first().toArray();
+        if (!components.isEmpty())
+          return components;
+      }
+      return QJsonArray();
+    }
+
+    if (value.isArray())
+      return value.toArray();
+
+    return QJsonArray();
+  };
+
+  QJsonArray values = extract_gradient_values(stops_value);
+  if (values.isEmpty())
+    return nullptr;
+
+  qsizetype value_count = values.size();
+  int derived_stop_count = int(value_count / 4);
+  int color_stop_count = stop_count > 0 ? std::min(stop_count, derived_stop_count) : derived_stop_count;
+
+  if (color_stop_count < 0)
+    color_stop_count = 0;
+
+  std::vector<LottieGradientStop> stops;
+  stops.reserve(size_t(color_stop_count));
+
+  for (int i = 0; i < color_stop_count; i++) {
+    int base = i * 4;
+    double offset = values.at(base).toDouble();
+    if (offset < 0.0) offset = 0.0;
+    if (offset > 1.0) offset = 1.0;
+    LottieColor color;
+    color.r = values.at(base + 1).toDouble();
+    color.g = values.at(base + 2).toDouble();
+    color.b = values.at(base + 3).toDouble();
+    color.a = 1.0;
+    stops.push_back(LottieGradientStop{offset, color});
+  }
+
+  std::vector<std::pair<double, double>> alphaStops;
+  for (int i = color_stop_count * 4; i + 1 < values.size(); i += 2) {
+    double offset = values.at(i).toDouble();
+    if (offset < 0.0) offset = 0.0;
+    if (offset > 1.0) offset = 1.0;
+    double alpha = values.at(i + 1).toDouble();
+    if (alpha < 0.0) alpha = 0.0;
+    if (alpha > 1.0) alpha = 1.0;
+    alphaStops.emplace_back(offset, alpha);
+  }
+
+  auto alpha_at = [&](double offset) noexcept -> double {
+    if (alphaStops.empty())
+      return 1.0;
+    if (offset <= alphaStops.front().first)
+      return alphaStops.front().second;
+    if (offset >= alphaStops.back().first)
+      return alphaStops.back().second;
+
+    for (size_t i = 0; i + 1 < alphaStops.size(); i++) {
+      double p0 = alphaStops[i].first;
+      double p1 = alphaStops[i + 1].first;
+      double a0 = alphaStops[i].second;
+      double a1 = alphaStops[i + 1].second;
+      if (offset >= p0 && offset <= p1) {
+        double denom = p1 - p0;
+        double t = denom != 0.0 ? (offset - p0) / denom : 0.0;
+        if (t < 0.0) t = 0.0;
+        if (t > 1.0) t = 1.0;
+        return a0 + (a1 - a0) * t;
+      }
+    }
+    return alphaStops.back().second;
+  };
+
+  for (auto& stop : stops)
+    stop.color.a = alpha_at(stop.offset);
+
+  if (stops.empty())
+    return nullptr;
+
+  std::sort(stops.begin(), stops.end(), [](const LottieGradientStop& a, const LottieGradientStop& b) noexcept {
+    return a.offset < b.offset;
+  });
+
+  fill->stops = std::move(stops);
+  return fill;
+}
+
 std::unique_ptr<LottieFill> parse_fill(const QJsonObject& obj) {
   auto fill = std::make_unique<LottieFill>();
   parse_animated_color(obj.value(QLatin1String("c")), fill->color, LottieColor{0.0, 0.0, 0.0, 1.0});
@@ -366,6 +514,9 @@ std::unique_ptr<LottieNode> parse_shape_item(const QJsonObject& obj) {
 
   if (type == QLatin1String("el"))
     return parse_ellipse(obj);
+
+  if (type == QLatin1String("gf"))
+    return parse_gradient_fill(obj);
 
   if (type == QLatin1String("fl"))
     return parse_fill(obj);
@@ -447,7 +598,7 @@ void render_group(const LottieGroup& group, BLContext& ctx, double frame, const 
   bool path_consumed = false;
 
   struct DrawCommand {
-    enum Type { kGroup, kFill, kStroke } type;
+    enum Type { kGroup, kFill, kStroke, kGradientFill } type;
 
     const LottieGroup* group {};
     BLMatrix2D matrix {};
@@ -456,6 +607,7 @@ void render_group(const LottieGroup& group, BLContext& ctx, double frame, const 
     BLPath path {};
     BLFillRule fill_rule {BL_FILL_RULE_NON_ZERO};
     BLRgba32 color {};
+    BLGradient gradient;
 
     double stroke_width {};
     BLStrokeCap stroke_cap {BL_STROKE_CAP_BUTT};
@@ -493,6 +645,15 @@ void render_group(const LottieGroup& group, BLContext& ctx, double frame, const 
     cmd.stroke_cap = cap;
     cmd.stroke_join = join;
     cmd.miter_limit = miter_limit;
+    commands.push_back(std::move(cmd));
+  };
+
+  auto emit_gradient_fill_command = [&](const BLPath& combined, BLFillRule rule, BLGradient&& gradient) {
+    DrawCommand cmd;
+    cmd.type = DrawCommand::kGradientFill;
+    cmd.path = combined;
+    cmd.fill_rule = rule;
+    cmd.gradient = std::move(gradient);
     commands.push_back(std::move(cmd));
   };
 
@@ -535,6 +696,50 @@ void render_group(const LottieGroup& group, BLContext& ctx, double frame, const 
 
           if (!combined.is_empty())
             emit_fill_command(fill, combined, rule, rgba);
+        }
+        path_consumed = true;
+        break;
+      }
+
+      case LottieNode::kGradientFill: {
+        const LottieGradientFill& gradient = static_cast<const LottieGradientFill&>(*child);
+        double style_opacity = gradient.opacity.evaluate(frame) * 0.01;
+        double final_opacity = local_opacity * style_opacity;
+        if (final_opacity > 0.0 && !path_stack.empty() && !gradient.stops.empty()) {
+          LottieVec2 start = gradient.start.evaluate(frame);
+          LottieVec2 end = gradient.end.evaluate(frame);
+
+          BLPoint p0 = matrix.map_point(start.x, start.y);
+          BLPoint p1 = matrix.map_point(end.x, end.y);
+
+          BLGradient bl_gradient;
+          if (gradient.gradient_type == 2) {
+            double radius = std::hypot(p1.x - p0.x, p1.y - p0.y);
+            if (radius <= 0.0)
+              radius = 0.0001;
+            bl_gradient = BLGradient(BLRadialGradientValues(p0.x, p0.y, 0.0, p1.x, p1.y, radius));
+          }
+          else {
+            bl_gradient = BLGradient(BLLinearGradientValues(p0.x, p0.y, p1.x, p1.y));
+          }
+
+          for (const LottieGradientStop& stop : gradient.stops) {
+            BLRgba32 rgba = make_rgba32(stop.color, final_opacity);
+            bl_gradient.add_stop(stop.offset, rgba);
+          }
+
+          BLFillRule rule = gradient.fill_rule == 2 ? BL_FILL_RULE_EVEN_ODD : BL_FILL_RULE_NON_ZERO;
+          BLPath combined;
+          for (const LottieShapePath* path : path_stack) {
+            if (!path)
+              continue;
+            BLPath transformed(path->path);
+            transformed.transform(matrix);
+            combined.add_path(transformed);
+          }
+
+          if (!combined.is_empty())
+            emit_gradient_fill_command(combined, rule, std::move(bl_gradient));
         }
         path_consumed = true;
         break;
@@ -583,6 +788,11 @@ void render_group(const LottieGroup& group, BLContext& ctx, double frame, const 
         ctx.fill_path(cmd.path, cmd.color);
         break;
 
+      case DrawCommand::kGradientFill:
+        ctx.set_fill_rule(cmd.fill_rule);
+        ctx.fill_path(cmd.path, cmd.gradient);
+        break;
+
       case DrawCommand::kStroke:
         ctx.set_stroke_width(cmd.stroke_width);
         ctx.set_stroke_caps(cmd.stroke_cap);
@@ -628,6 +838,9 @@ LottieShapePath::LottieShapePath()
 
 LottieFill::LottieFill()
   : LottieNode(LottieNode::kFill) {}
+
+LottieGradientFill::LottieGradientFill()
+  : LottieNode(LottieNode::kGradientFill) {}
 
 LottieStroke::LottieStroke()
   : LottieNode(LottieNode::kStroke) {}

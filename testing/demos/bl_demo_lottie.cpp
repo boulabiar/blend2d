@@ -140,7 +140,7 @@ private:
 
   void onRenderBlend2D(BLContext& ctx) noexcept {
     ctx.clear_all();
-    ctx.fill_all(BLRgba32(0xFF1E1E1E));
+    ctx.fill_all(BLRgba32(0xFFFFFFFF));
 
     if (!_composition.is_valid())
       return;

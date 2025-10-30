@@ -84,7 +84,8 @@ struct LottieNode {
     kGroup,
     kPath,
     kFill,
-    kStroke
+    kStroke,
+    kGradientFill
   };
 
   explicit LottieNode(Type type) : type(type) {}
@@ -103,6 +104,21 @@ struct LottieFill : public LottieNode {
   LottieAnimatedValue<LottieColor> color;
   LottieAnimatedValue<double> opacity;
   int fill_rule {};
+};
+
+struct LottieGradientStop {
+  double offset {};
+  LottieColor color;
+};
+
+struct LottieGradientFill : public LottieNode {
+  LottieGradientFill();
+  int gradient_type {1};
+  int fill_rule {1};
+  LottieAnimatedValue<LottieVec2> start;
+  LottieAnimatedValue<LottieVec2> end;
+  LottieAnimatedValue<double> opacity;
+  std::vector<LottieGradientStop> stops;
 };
 
 struct LottieStroke : public LottieNode {
