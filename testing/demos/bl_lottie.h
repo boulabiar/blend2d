@@ -145,6 +145,13 @@ struct LottieGradientFill : public LottieNode {
   std::vector<LottieGradientStop> stops;
 };
 
+struct LottieImageAsset {
+  QString id;
+  BLImage image;
+  double width {};
+  double height {};
+};
+
 struct LottieStroke : public LottieNode {
   LottieStroke();
   LottieAnimatedValue<LottieColor> color;
@@ -167,6 +174,9 @@ struct LottieLayer {
   int type {};
   int parent_index {-1};
   int parent {-1};
+  QString ref_id;
+  int image_index {-1};
+  int precomp_index {-1};
   double in_point {};
   double out_point {};
   LottieTransform transform;
@@ -196,6 +206,20 @@ private:
   QString _name;
 
   std::vector<LottieLayer> _layers;
+  std::vector<LottieImageAsset> _images;
+  struct LottiePrecomposition {
+    QString id;
+    double width {};
+    double height {};
+    std::vector<LottieLayer> layers;
+  };
+  std::vector<LottiePrecomposition> _precomps;
+
+  void render_layer_array(const std::vector<LottieLayer>& layers,
+                          BLContext& ctx,
+                          double frame,
+                          const BLMatrix2D& root_matrix,
+                          double opacity) const;
 };
 
 #endif // BL_DEMO_LOTTIE_H_INCLUDED

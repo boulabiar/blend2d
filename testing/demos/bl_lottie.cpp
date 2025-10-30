@@ -1,6 +1,10 @@
 #include "bl_lottie.h"
 
+#include <QtCore/QByteArray>
+#include <QtCore/QDir>
 #include <QtCore/QFile>
+#include <QtCore/QFileInfo>
+#include <QtCore/QHash>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonParseError>
 
@@ -1048,60 +1052,177 @@ bool LottieComposition::load_from_file(const QString& path, QString* error_messa
   _out_point = root.value(QLatin1String("op")).toDouble(_in_point);
   _name = root.value(QLatin1String("nm")).toString();
   _layers.clear();
+  _images.clear();
+  _precomps.clear();
 
-  QJsonArray layers = root.value(QLatin1String("layers")).toArray();
-  _layers.reserve(layers.size());
+  QHash<QString, int> image_index_map;
 
-  bool has_renderable_layer = false;
+  QJsonArray assets = root.value(QLatin1String("assets")).toArray();
+  QDir file_dir = QFileInfo(path).dir();
+  _images.reserve(assets.size());
 
-  for (const QJsonValue& layerValue : layers) {
-    if (!layerValue.isObject())
-      continue;
-    QJsonObject layerObj = layerValue.toObject();
+  auto load_image_asset = [&](const QJsonObject& asset_obj) -> void {
+    QString id = asset_obj.value(QLatin1String("id")).toString();
+    if (id.isEmpty())
+      return;
 
-    LottieLayer layer {};
-    layer.type = layerObj.value(QLatin1String("ty")).toInt();
-    layer.index = layerObj.value(QLatin1String("ind")).toInt();
-    layer.parent_index = layerObj.contains(QLatin1String("parent"))
-      ? layerObj.value(QLatin1String("parent")).toInt()
-      : -1;
-    layer.name = layerObj.value(QLatin1String("nm")).toString();
-    layer.in_point = layerObj.value(QLatin1String("ip")).toDouble(_in_point);
-    layer.out_point = layerObj.value(QLatin1String("op")).toDouble(_out_point);
-    parse_transform_object(layerObj.value(QLatin1String("ks")).toObject(), layer.transform);
+    QString file_name = asset_obj.value(QLatin1String("p")).toString();
+    if (file_name.isEmpty())
+      return;
 
-    QJsonArray shapes = layerObj.value(QLatin1String("shapes")).toArray();
-    if (!shapes.isEmpty()) {
-      auto root_group = std::make_unique<LottieGroup>();
-      for (const QJsonValue& shapeValue : shapes) {
-        if (!shapeValue.isObject())
-          continue;
-        std::unique_ptr<LottieNode> node = parse_shape_item(shapeValue.toObject());
-        if (node)
-          root_group->children.push_back(std::move(node));
-      }
-      if (!root_group->children.empty()) {
-        layer.root = std::move(root_group);
-        has_renderable_layer = true;
-      }
+    int embed = asset_obj.value(QLatin1String("e")).toInt();
+    BLImage image;
+    bool loaded = false;
+
+    if (embed == 1 || file_name.startsWith(QLatin1String("data:"))) {
+      QString data_str = file_name;
+      int comma_pos = data_str.indexOf(QLatin1Char(','));
+      if (comma_pos >= 0)
+        data_str = data_str.mid(comma_pos + 1);
+      QByteArray decoded = QByteArray::fromBase64(data_str.toUtf8());
+      if (!decoded.isEmpty())
+        loaded = image.read_from_data(decoded.constData(), size_t(decoded.size())) == BL_SUCCESS;
+    }
+    else {
+      QString base_path = asset_obj.value(QLatin1String("u")).toString();
+      QString absolute_path = file_dir.absoluteFilePath(base_path + file_name);
+      QByteArray encoded = QFile::encodeName(absolute_path);
+      loaded = image.read_from_file(encoded.constData()) == BL_SUCCESS;
     }
 
-    _layers.push_back(std::move(layer));
-  }
+    if (!loaded || !image)
+      return;
 
-  std::unordered_map<int, size_t> index_map;
-  index_map.reserve(_layers.size());
-  for (size_t i = 0; i < _layers.size(); i++) {
-    int layer_index = _layers[i].index;
-    index_map[layer_index] = i;
-  }
+    LottieImageAsset asset {};
+    asset.id = id;
+    asset.image = std::move(image);
+    asset.width = asset_obj.value(QLatin1String("w")).toDouble(double(asset.image.width()));
+    asset.height = asset_obj.value(QLatin1String("h")).toDouble(double(asset.image.height()));
+    image_index_map.insert(id, _images.size());
+    _images.push_back(std::move(asset));
+  };
 
-  for (LottieLayer& layer : _layers) {
-    if (layer.parent_index < 0)
+  for (const QJsonValue& assetValue : assets) {
+    if (!assetValue.isObject())
       continue;
-    auto it = index_map.find(layer.parent_index);
-    if (it != index_map.end())
-      layer.parent = int(it->second);
+    QJsonObject assetObj = assetValue.toObject();
+    if (assetObj.contains(QLatin1String("p")))
+      load_image_asset(assetObj);
+  }
+
+  auto finalize_parent_relationships = [](std::vector<LottieLayer>& layers) {
+    QHash<int, int> index_map;
+    index_map.reserve(int(layers.size()));
+    for (int i = 0; i < int(layers.size()); i++) {
+      int layer_index = layers[size_t(i)].index;
+      index_map.insert(layer_index, i);
+    }
+
+    for (LottieLayer& layer : layers) {
+      if (layer.parent_index < 0)
+        continue;
+      auto it = index_map.constFind(layer.parent_index);
+      if (it != index_map.constEnd())
+        layer.parent = *it;
+    }
+  };
+
+  auto parse_layer_array = [&](const QJsonArray& layer_array, std::vector<LottieLayer>& target) {
+    target.clear();
+    target.reserve(layer_array.size());
+
+    for (const QJsonValue& layerValue : layer_array) {
+      if (!layerValue.isObject())
+        continue;
+      QJsonObject layerObj = layerValue.toObject();
+
+      LottieLayer layer {};
+      layer.type = layerObj.value(QLatin1String("ty")).toInt();
+      layer.index = layerObj.value(QLatin1String("ind")).toInt();
+      layer.parent_index = layerObj.contains(QLatin1String("parent"))
+        ? layerObj.value(QLatin1String("parent")).toInt()
+        : -1;
+      layer.name = layerObj.value(QLatin1String("nm")).toString();
+      layer.ref_id = layerObj.value(QLatin1String("refId")).toString();
+      layer.in_point = layerObj.value(QLatin1String("ip")).toDouble(_in_point);
+      layer.out_point = layerObj.value(QLatin1String("op")).toDouble(_out_point);
+      parse_transform_object(layerObj.value(QLatin1String("ks")).toObject(), layer.transform);
+
+      if (layer.type == 4) {
+        QJsonArray shapes = layerObj.value(QLatin1String("shapes")).toArray();
+        if (!shapes.isEmpty()) {
+          auto root_group = std::make_unique<LottieGroup>();
+          for (const QJsonValue& shapeValue : shapes) {
+            if (!shapeValue.isObject())
+              continue;
+            std::unique_ptr<LottieNode> node = parse_shape_item(shapeValue.toObject());
+            if (node)
+              root_group->children.push_back(std::move(node));
+          }
+          if (!root_group->children.empty())
+            layer.root = std::move(root_group);
+        }
+      }
+
+      target.push_back(std::move(layer));
+    }
+
+    finalize_parent_relationships(target);
+  };
+
+  auto resolve_layer_resources = [&](std::vector<LottieLayer>& layers, const QHash<QString, int>& local_image_map, const QHash<QString, int>& local_precomp_map) {
+    for (LottieLayer& layer : layers) {
+      layer.image_index = -1;
+      layer.precomp_index = -1;
+
+      if (layer.type == 2 && !layer.ref_id.isEmpty()) {
+        auto it = local_image_map.constFind(layer.ref_id);
+        if (it != local_image_map.constEnd())
+          layer.image_index = *it;
+      }
+      else if (layer.type == 0 && !layer.ref_id.isEmpty()) {
+        auto it = local_precomp_map.constFind(layer.ref_id);
+        if (it != local_precomp_map.constEnd())
+          layer.precomp_index = *it;
+      }
+    }
+  };
+
+  QHash<QString, int> precomp_index_map;
+
+  for (const QJsonValue& assetValue : assets) {
+    if (!assetValue.isObject())
+      continue;
+    QJsonObject assetObj = assetValue.toObject();
+    if (!assetObj.contains(QLatin1String("layers")))
+      continue;
+
+    LottiePrecomposition precomp {};
+    precomp.id = assetObj.value(QLatin1String("id")).toString();
+    precomp.width = assetObj.value(QLatin1String("w")).toDouble(0.0);
+    precomp.height = assetObj.value(QLatin1String("h")).toDouble(0.0);
+    parse_layer_array(assetObj.value(QLatin1String("layers")).toArray(), precomp.layers);
+    _precomps.push_back(std::move(precomp));
+  }
+
+  for (int i = 0; i < int(_precomps.size()); i++)
+    precomp_index_map.insert(_precomps[size_t(i)].id, i);
+
+  for (LottiePrecomposition& precomp : _precomps)
+    resolve_layer_resources(precomp.layers, image_index_map, precomp_index_map);
+
+  QJsonArray layers = root.value(QLatin1String("layers")).toArray();
+  parse_layer_array(layers, _layers);
+  resolve_layer_resources(_layers, image_index_map, precomp_index_map);
+
+  bool has_renderable_layer = false;
+  for (const LottieLayer& layer : _layers) {
+    if ((layer.root && !layer.root->children.empty()) ||
+        (layer.type == 2 && layer.image_index >= 0 && layer.image_index < int(_images.size())) ||
+        (layer.type == 0 && layer.precomp_index >= 0 && layer.precomp_index < int(_precomps.size()))) {
+      has_renderable_layer = true;
+      break;
+    }
   }
 
   if (!has_renderable_layer) {
@@ -1114,17 +1235,25 @@ bool LottieComposition::load_from_file(const QString& path, QString* error_messa
 }
 
 void LottieComposition::render(BLContext& ctx, double frame, const BLMatrix2D& root_matrix, double opacity) const {
-  if (_layers.empty())
+  render_layer_array(_layers, ctx, frame, root_matrix, opacity);
+}
+
+void LottieComposition::render_layer_array(const std::vector<LottieLayer>& layers,
+                                           BLContext& ctx,
+                                           double frame,
+                                           const BLMatrix2D& root_matrix,
+                                           double opacity) const {
+  if (layers.empty())
     return;
 
-  std::vector<BLMatrix2D> matrix_cache(_layers.size());
-  std::vector<uint8_t> matrix_valid(_layers.size(), 0);
+  std::vector<BLMatrix2D> matrix_cache(layers.size());
+  std::vector<uint8_t> matrix_valid(layers.size(), 0);
   std::function<BLMatrix2D(size_t)> resolve_matrix = [&](size_t index) -> BLMatrix2D {
     if (matrix_valid[index])
       return matrix_cache[index];
 
-    BLMatrix2D mat = _layers[index].transform.matrix(frame);
-    int parent = _layers[index].parent;
+    BLMatrix2D mat = layers[index].transform.matrix(frame);
+    int parent = layers[index].parent;
     if (parent >= 0)
       mat = lottie_matrix_multiply(resolve_matrix(size_t(parent)), mat);
 
@@ -1133,14 +1262,14 @@ void LottieComposition::render(BLContext& ctx, double frame, const BLMatrix2D& r
     return mat;
   };
 
-  std::vector<double> opacity_cache(_layers.size());
-  std::vector<uint8_t> opacity_valid(_layers.size(), 0);
+  std::vector<double> opacity_cache(layers.size());
+  std::vector<uint8_t> opacity_valid(layers.size(), 0);
   std::function<double(size_t)> resolve_opacity = [&](size_t index) -> double {
     if (opacity_valid[index])
       return opacity_cache[index];
 
-    double value = _layers[index].transform.opacity_at(frame);
-    int parent = _layers[index].parent;
+    double value = layers[index].transform.opacity_at(frame);
+    int parent = layers[index].parent;
     if (parent >= 0)
       value *= resolve_opacity(size_t(parent));
 
@@ -1152,9 +1281,12 @@ void LottieComposition::render(BLContext& ctx, double frame, const BLMatrix2D& r
     return value;
   };
 
-  for (size_t i = _layers.size(); i-- > 0;) {
-    const LottieLayer& layer = _layers[i];
-    if (!layer.root)
+  for (size_t i = layers.size(); i-- > 0;) {
+    const LottieLayer& layer = layers[i];
+    bool has_vector = layer.root != nullptr;
+    bool has_image = layer.image_index >= 0 && size_t(layer.image_index) < _images.size();
+    bool has_precomp = layer.precomp_index >= 0 && size_t(layer.precomp_index) < _precomps.size();
+    if (!has_vector && !has_image && !has_precomp)
       continue;
 
     if (frame < layer.in_point || frame >= layer.out_point)
@@ -1165,6 +1297,25 @@ void LottieComposition::render(BLContext& ctx, double frame, const BLMatrix2D& r
       continue;
 
     BLMatrix2D layer_matrix = lottie_matrix_multiply(root_matrix, resolve_matrix(i));
-    render_group(*layer.root, ctx, frame, layer_matrix, layer_opacity);
+    if (has_vector)
+      render_group(*layer.root, ctx, frame, layer_matrix, layer_opacity);
+
+    if (has_image) {
+      const LottieImageAsset& image = _images[layer.image_index];
+      if (image.image && image.width > 0.0 && image.height > 0.0) {
+        ctx.save();
+        ctx.apply_transform(layer_matrix);
+        double previous_alpha = ctx.global_alpha();
+        ctx.set_global_alpha(previous_alpha * layer_opacity);
+        ctx.blit_image(BLRect(0.0, 0.0, image.width, image.height), image.image);
+        ctx.set_global_alpha(previous_alpha);
+        ctx.restore();
+      }
+    }
+
+    if (has_precomp) {
+      const LottiePrecomposition& precomp = _precomps[layer.precomp_index];
+      render_layer_array(precomp.layers, ctx, frame, layer_matrix, layer_opacity);
+    }
   }
 }
