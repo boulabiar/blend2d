@@ -139,7 +139,10 @@ struct LottieGroup : public LottieNode {
 
 struct LottieLayer {
   QString name;
+  int index {};
   int type {};
+  int parent_index {-1};
+  int parent {-1};
   double in_point {};
   double out_point {};
   LottieTransform transform;

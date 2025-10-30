@@ -6,6 +6,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
+#include <functional>
+#include <unordered_map>
 #include <utility>
 
 BLMatrix2D lottie_matrix_multiply(const BLMatrix2D& a, const BLMatrix2D& b) noexcept {
@@ -909,37 +912,61 @@ bool LottieComposition::load_from_file(const QString& path, QString* error_messa
   _layers.clear();
 
   QJsonArray layers = root.value(QLatin1String("layers")).toArray();
+  _layers.reserve(layers.size());
+
+  bool has_renderable_layer = false;
+
   for (const QJsonValue& layerValue : layers) {
     if (!layerValue.isObject())
       continue;
     QJsonObject layerObj = layerValue.toObject();
-    int type = layerObj.value(QLatin1String("ty")).toInt();
-    if (type != 4)
-      continue;
 
     LottieLayer layer {};
-    layer.type = type;
+    layer.type = layerObj.value(QLatin1String("ty")).toInt();
+    layer.index = layerObj.value(QLatin1String("ind")).toInt();
+    layer.parent_index = layerObj.contains(QLatin1String("parent"))
+      ? layerObj.value(QLatin1String("parent")).toInt()
+      : -1;
     layer.name = layerObj.value(QLatin1String("nm")).toString();
     layer.in_point = layerObj.value(QLatin1String("ip")).toDouble(_in_point);
     layer.out_point = layerObj.value(QLatin1String("op")).toDouble(_out_point);
     parse_transform_object(layerObj.value(QLatin1String("ks")).toObject(), layer.transform);
 
-    auto root_group = std::make_unique<LottieGroup>();
     QJsonArray shapes = layerObj.value(QLatin1String("shapes")).toArray();
-    for (const QJsonValue& shapeValue : shapes) {
-      if (!shapeValue.isObject())
-        continue;
-      std::unique_ptr<LottieNode> node = parse_shape_item(shapeValue.toObject());
-      if (node)
-        root_group->children.push_back(std::move(node));
+    if (!shapes.isEmpty()) {
+      auto root_group = std::make_unique<LottieGroup>();
+      for (const QJsonValue& shapeValue : shapes) {
+        if (!shapeValue.isObject())
+          continue;
+        std::unique_ptr<LottieNode> node = parse_shape_item(shapeValue.toObject());
+        if (node)
+          root_group->children.push_back(std::move(node));
+      }
+      if (!root_group->children.empty()) {
+        layer.root = std::move(root_group);
+        has_renderable_layer = true;
+      }
     }
 
-    layer.root = std::move(root_group);
-    if (layer.root && !layer.root->children.empty())
-      _layers.push_back(std::move(layer));
+    _layers.push_back(std::move(layer));
   }
 
-  if (_layers.empty()) {
+  std::unordered_map<int, size_t> index_map;
+  index_map.reserve(_layers.size());
+  for (size_t i = 0; i < _layers.size(); i++) {
+    int layer_index = _layers[i].index;
+    index_map[layer_index] = i;
+  }
+
+  for (LottieLayer& layer : _layers) {
+    if (layer.parent_index < 0)
+      continue;
+    auto it = index_map.find(layer.parent_index);
+    if (it != index_map.end())
+      layer.parent = int(it->second);
+  }
+
+  if (!has_renderable_layer) {
     if (error_message)
       *error_message = QString::fromLatin1("No supported shape layers found in %1").arg(path);
     return false;
@@ -952,19 +979,54 @@ void LottieComposition::render(BLContext& ctx, double frame, const BLMatrix2D& r
   if (_layers.empty())
     return;
 
-  for (auto it = _layers.rbegin(); it != _layers.rend(); ++it) {
-    const LottieLayer& layer = *it;
+  std::vector<BLMatrix2D> matrix_cache(_layers.size());
+  std::vector<uint8_t> matrix_valid(_layers.size(), 0);
+  std::function<BLMatrix2D(size_t)> resolve_matrix = [&](size_t index) -> BLMatrix2D {
+    if (matrix_valid[index])
+      return matrix_cache[index];
+
+    BLMatrix2D mat = _layers[index].transform.matrix(frame);
+    int parent = _layers[index].parent;
+    if (parent >= 0)
+      mat = lottie_matrix_multiply(resolve_matrix(size_t(parent)), mat);
+
+    matrix_cache[index] = mat;
+    matrix_valid[index] = 1;
+    return mat;
+  };
+
+  std::vector<double> opacity_cache(_layers.size());
+  std::vector<uint8_t> opacity_valid(_layers.size(), 0);
+  std::function<double(size_t)> resolve_opacity = [&](size_t index) -> double {
+    if (opacity_valid[index])
+      return opacity_cache[index];
+
+    double value = _layers[index].transform.opacity_at(frame);
+    int parent = _layers[index].parent;
+    if (parent >= 0)
+      value *= resolve_opacity(size_t(parent));
+
+    if (value < 0.0) value = 0.0;
+    if (value > 1.0) value = 1.0;
+
+    opacity_cache[index] = value;
+    opacity_valid[index] = 1;
+    return value;
+  };
+
+  for (size_t i = _layers.size(); i-- > 0;) {
+    const LottieLayer& layer = _layers[i];
     if (!layer.root)
       continue;
 
     if (frame < layer.in_point || frame >= layer.out_point)
       continue;
 
-    double layer_opacity = opacity * layer.transform.opacity_at(frame);
+    double layer_opacity = opacity * resolve_opacity(i);
     if (layer_opacity <= 0.0)
       continue;
 
-    BLMatrix2D layer_matrix = lottie_matrix_multiply(root_matrix, layer.transform.matrix(frame));
+    BLMatrix2D layer_matrix = lottie_matrix_multiply(root_matrix, resolve_matrix(i));
     render_group(*layer.root, ctx, frame, layer_matrix, layer_opacity);
   }
 }
