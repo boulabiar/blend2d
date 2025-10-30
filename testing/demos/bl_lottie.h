@@ -121,7 +121,7 @@ struct LottieShapePath : public LottieNode {
   mutable bool cache_valid {};
   mutable ShapeData interpolated_shape;
 
-  const BLPath& path_at(double frame) const;
+  virtual const BLPath& path_at(double frame) const;
 };
 
 struct LottieFill : public LottieNode {
@@ -177,6 +177,23 @@ struct LottieGroup : public LottieNode {
   LottieTransform transform;
   std::vector<std::unique_ptr<LottieNode>> children;
   std::vector<std::unique_ptr<LottieTrimPath>> trims;
+};
+
+struct LottiePolystar : public LottieShapePath {
+  LottiePolystar();
+
+  int star_type {1};
+  int direction {1};
+
+  LottieAnimatedValue<double> points;
+  LottieAnimatedValue<LottieVec2> position;
+  LottieAnimatedValue<double> rotation;
+  LottieAnimatedValue<double> outer_radius;
+  LottieAnimatedValue<double> outer_roundness;
+  LottieAnimatedValue<double> inner_radius;
+  LottieAnimatedValue<double> inner_roundness;
+
+  const BLPath& path_at(double frame) const override;
 };
 
 struct LottieLayer {

@@ -772,6 +772,41 @@ std::unique_ptr<LottieShapePath> parse_shape_path(const QJsonObject& obj) {
   return path;
 }
 
+std::unique_ptr<LottieShapePath> parse_polystar(const QJsonObject& obj) {
+  auto star = std::make_unique<LottiePolystar>();
+
+  star->star_type = obj.value(QLatin1String("sy")).toInt(1);
+  const int dir_value = obj.value(QLatin1String("d")).toInt(1);
+  star->direction = dir_value == 3 ? -1 : 1;
+
+  parse_animated_double(obj.value(QLatin1String("pt")), star->points, 5.0);
+  parse_animated_vec2(obj.value(QLatin1String("p")), star->position, LottieVec2{0.0, 0.0});
+  parse_animated_double(obj.value(QLatin1String("r")), star->rotation, 0.0);
+  parse_animated_double(obj.value(QLatin1String("or")), star->outer_radius, 0.0);
+  parse_animated_double(obj.value(QLatin1String("os")), star->outer_roundness, 0.0);
+
+  if (star->star_type == 1) {
+    parse_animated_double(obj.value(QLatin1String("ir")), star->inner_radius, 0.0);
+    parse_animated_double(obj.value(QLatin1String("is")), star->inner_roundness, 0.0);
+  }
+  else {
+    star->inner_radius.animated = false;
+    star->inner_radius.value = 0.0;
+    star->inner_roundness.animated = false;
+    star->inner_roundness.value = 0.0;
+  }
+
+  star->animated = star->points.animated ||
+                   star->position.animated ||
+                   star->rotation.animated ||
+                   star->outer_radius.animated ||
+                   star->outer_roundness.animated ||
+                   star->inner_radius.animated ||
+                   star->inner_roundness.animated;
+  star->cache_valid = false;
+  return star;
+}
+
 std::unique_ptr<LottieShapePath> parse_rectangle(const QJsonObject& obj) {
   const QJsonObject posObj = obj.value(QLatin1String("p")).toObject();
   const QJsonObject sizeObj = obj.value(QLatin1String("s")).toObject();
@@ -1012,6 +1047,9 @@ std::unique_ptr<LottieNode> parse_shape_item(const QJsonObject& obj) {
 
   if (type == QLatin1String("el"))
     return parse_ellipse(obj);
+
+  if (type == QLatin1String("sr"))
+    return parse_polystar(obj);
 
   if (type == QLatin1String("gf"))
     return parse_gradient_fill(obj);
@@ -1475,6 +1513,77 @@ const BLPath& LottieShapePath::path_at(double frame) const {
     shape_ptr = &keyframes.back().shape;
 
   return refresh_cache(*shape_ptr);
+}
+
+LottiePolystar::LottiePolystar()
+  : LottieShapePath() {
+  points.value = 5.0;
+  position.value = LottieVec2{0.0, 0.0};
+  rotation.value = 0.0;
+  outer_radius.value = 0.0;
+  outer_roundness.value = 0.0;
+  inner_radius.value = 0.0;
+  inner_roundness.value = 0.0;
+  animated = true;
+  cache_valid = false;
+}
+
+const BLPath& LottiePolystar::path_at(double frame) const {
+  if (cache_valid && cached_frame == frame)
+    return cached_path;
+
+  cached_path.clear();
+
+  const double evaluated_points = std::max(points.evaluate(frame), 0.0);
+  const double evaluated_outer = std::abs(outer_radius.evaluate(frame));
+  double evaluated_inner = std::abs(inner_radius.evaluate(frame));
+  const double evaluated_rotation = rotation.evaluate(frame);
+  const LottieVec2 center = position.evaluate(frame);
+  const int direction_sign = direction >= 0 ? 1 : -1;
+
+  if (evaluated_outer <= 0.0 || evaluated_points < 2.0) {
+    cached_frame = frame;
+    cache_valid = true;
+    return cached_path;
+  }
+
+  int point_count = std::max(2, int(std::round(evaluated_points)));
+  const double angle_step = (2.0 * kPi / double(point_count)) * double(direction_sign);
+  const double start_angle = (evaluated_rotation - 90.0) * (kPi / 180.0);
+
+  if (star_type == 1 && evaluated_inner > 0.0) {
+    const double half_step = angle_step * 0.5;
+    for (int i = 0; i < point_count; ++i) {
+      const double outer_angle = start_angle + angle_step * i;
+      const double ox = center.x + std::cos(outer_angle) * evaluated_outer;
+      const double oy = center.y + std::sin(outer_angle) * evaluated_outer;
+      if (i == 0)
+        cached_path.move_to(ox, oy);
+      else
+        cached_path.line_to(ox, oy);
+
+      const double inner_angle = outer_angle + half_step;
+      const double ix = center.x + std::cos(inner_angle) * evaluated_inner;
+      const double iy = center.y + std::sin(inner_angle) * evaluated_inner;
+      cached_path.line_to(ix, iy);
+    }
+  }
+  else {
+    for (int i = 0; i < point_count; ++i) {
+      const double angle = start_angle + angle_step * i;
+      const double x = center.x + std::cos(angle) * evaluated_outer;
+      const double y = center.y + std::sin(angle) * evaluated_outer;
+      if (i == 0)
+        cached_path.move_to(x, y);
+      else
+        cached_path.line_to(x, y);
+    }
+  }
+
+  cached_path.close();
+  cached_frame = frame;
+  cache_valid = true;
+  return cached_path;
 }
 
 LottieFill::LottieFill()
