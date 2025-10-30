@@ -1696,6 +1696,26 @@ double lottie_lerp(const double a, const double b, const double t) noexcept {
   return a + (b - a) * t;
 }
 
+static bool apply_layer_blend_mode(BLContext& ctx, int blend_mode) noexcept {
+  BLCompOp comp_op = BL_COMP_OP_SRC_OVER;
+  switch (blend_mode) {
+    case 1: comp_op = BL_COMP_OP_MULTIPLY; break;
+    case 2: comp_op = BL_COMP_OP_SCREEN; break;
+    case 3: comp_op = BL_COMP_OP_OVERLAY; break;
+    case 4: comp_op = BL_COMP_OP_DARKEN; break;
+    case 5: comp_op = BL_COMP_OP_LIGHTEN; break;
+    case 6: comp_op = BL_COMP_OP_COLOR_DODGE; break;
+    case 7: comp_op = BL_COMP_OP_COLOR_BURN; break;
+    case 8: comp_op = BL_COMP_OP_HARD_LIGHT; break;
+    case 9: comp_op = BL_COMP_OP_SOFT_LIGHT; break;
+    case 10: comp_op = BL_COMP_OP_DIFFERENCE; break;
+    case 11: comp_op = BL_COMP_OP_EXCLUSION; break;
+    default: return false;
+  }
+  ctx.set_comp_op(comp_op);
+  return true;
+}
+
 LottieVec2 lottie_lerp(const LottieVec2& a, const LottieVec2& b, double t) noexcept {
   return LottieVec2{lottie_lerp(a.x, b.x, t), lottie_lerp(a.y, b.y, t)};
 }
@@ -2181,6 +2201,7 @@ bool LottieComposition::load_from_file(const QString& path, QString* error_messa
       layer.track_matte_mode = layerObj.value(QLatin1String("tt")).toInt();
       layer.matte_source_mode = layerObj.value(QLatin1String("td")).toInt();
       layer.is_matte_source = layer.matte_source_mode != 0;
+      layer.blend_mode = layerObj.value(QLatin1String("bm")).toInt(0);
       layer.hidden = false;
       layer.matte_source = -1;
       layer.matte_mode = 0;
@@ -2399,16 +2420,22 @@ void LottieComposition::render_layer_array(const std::vector<LottieLayer>& layer
       BLImage content_image = render_to_image(layer, layer_matrix, layer_opacity);
 
       if (matte_image && content_image) {
+        ctx.save();
+        apply_layer_blend_mode(ctx, layer.blend_mode);
         if (layer.matte_mode == 1 || layer.matte_mode == 2) {
           BLContext blendCtx(content_image);
           blendCtx.set_comp_op(layer.matte_mode == 1 ? BL_COMP_OP_DST_IN : BL_COMP_OP_DST_OUT);
           blendCtx.blit_image(BLPoint(0, 0), matte_image);
         }
         ctx.blit_image(BLPoint(0, 0), content_image);
+        ctx.restore();
       }
       continue;
     }
 
+    ctx.save();
+    apply_layer_blend_mode(ctx, layer.blend_mode);
     render_layer_content(layer, ctx, frame, layer_matrix, layer_opacity);
+    ctx.restore();
   }
 }

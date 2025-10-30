@@ -225,6 +225,7 @@ struct LottieLayer {
   int matte_mode {};
   int track_matte_mode {};
   int matte_source_mode {};
+  int blend_mode {};
   bool is_matte_source {};
   bool hidden {};
   double in_point {};
