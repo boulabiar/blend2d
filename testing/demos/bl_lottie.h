@@ -179,6 +179,21 @@ struct LottieGroup : public LottieNode {
   std::vector<std::unique_ptr<LottieTrimPath>> trims;
 };
 
+struct LottieMask {
+  enum Mode {
+    kAdd,
+    kSubtract,
+    kIntersect,
+    kUnknown
+  };
+
+  LottieMask();
+  Mode mode {kAdd};
+  bool inverted {};
+  LottieAnimatedValue<double> opacity;
+  LottieShapePath path;
+};
+
 struct LottiePolystar : public LottieShapePath {
   LottiePolystar();
 
@@ -214,6 +229,11 @@ struct LottieLayer {
   double in_point {};
   double out_point {};
   LottieTransform transform;
+  std::vector<LottieMask> masks;
+  bool is_solid {};
+  double solid_width {};
+  double solid_height {};
+  LottieColor solid_color;
   std::unique_ptr<LottieGroup> root;
 };
 

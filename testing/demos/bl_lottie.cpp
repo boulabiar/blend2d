@@ -71,6 +71,45 @@ LottieColor to_color(const QJsonValue& value, const LottieColor& fallback) noexc
   return result;
 }
 
+LottieColor parse_hex_color(const QString& value) noexcept {
+  LottieColor color {};
+  color.a = 1.0;
+
+  auto parse_component = [](const QString& str, int start) -> int {
+    bool ok = false;
+    const int result = str.mid(start, 2).toInt(&ok, 16);
+    return ok ? result : -1;
+  };
+
+  if (value.size() == 7 && value.startsWith(QLatin1Char('#'))) {
+    const int r = parse_component(value, 1);
+    const int g = parse_component(value, 3);
+    const int b = parse_component(value, 5);
+    if (r >= 0 && g >= 0 && b >= 0) {
+      color.r = double(r) / 255.0;
+      color.g = double(g) / 255.0;
+      color.b = double(b) / 255.0;
+    }
+    return color;
+  }
+
+  if (value.size() == 9 && value.startsWith(QLatin1Char('#'))) {
+    const int a = parse_component(value, 1);
+    const int r = parse_component(value, 3);
+    const int g = parse_component(value, 5);
+    const int b = parse_component(value, 7);
+    if (a >= 0 && r >= 0 && g >= 0 && b >= 0) {
+      color.a = double(a) / 255.0;
+      color.r = double(r) / 255.0;
+      color.g = double(g) / 255.0;
+      color.b = double(b) / 255.0;
+    }
+    return color;
+  }
+
+  return color;
+}
+
 void parse_animated_double(const QJsonValue& value, LottieAnimatedValue<double>& dst, double fallback) {
   dst.animated = false;
   dst.value = fallback;
@@ -772,6 +811,34 @@ std::unique_ptr<LottieShapePath> parse_shape_path(const QJsonObject& obj) {
   return path;
 }
 
+bool parse_mask(const QJsonObject& obj, LottieMask& dst) {
+  const QString mode = obj.value(QLatin1String("mode")).toString();
+  if (mode == QLatin1String("s"))
+    dst.mode = LottieMask::kSubtract;
+  else if (mode == QLatin1String("i"))
+    dst.mode = LottieMask::kIntersect;
+  else if (mode == QLatin1String("a") || mode == QLatin1String("f") || mode.isEmpty())
+    dst.mode = LottieMask::kAdd;
+  else
+    dst.mode = LottieMask::kUnknown;
+
+  dst.inverted = obj.value(QLatin1String("inv")).toBool(false);
+  parse_animated_double(obj.value(QLatin1String("o")), dst.opacity, 100.0);
+
+  const QJsonObject pt = obj.value(QLatin1String("pt")).toObject();
+  if (pt.isEmpty())
+    return false;
+
+  QJsonObject wrapper;
+  wrapper.insert(QLatin1String("ks"), pt);
+  std::unique_ptr<LottieShapePath> path = parse_shape_path(wrapper);
+  if (!path)
+    return false;
+
+  dst.path = std::move(*path);
+  return true;
+}
+
 std::unique_ptr<LottieShapePath> parse_polystar(const QJsonObject& obj) {
   auto star = std::make_unique<LottiePolystar>();
 
@@ -1392,31 +1459,164 @@ void LottieComposition::render_layer_content(const LottieLayer& layer,
   if (opacity <= 0.0)
     return;
 
-  if (layer.root) {
-    const std::vector<const LottieTrimPath*> empty_trims;
-    render_group(*layer.root, ctx, frame, layer_matrix, opacity, empty_trims);
-    return;
-  }
+  const std::vector<const LottieTrimPath*> empty_trims;
 
-  if (layer.image_index >= 0 && size_t(layer.image_index) < _images.size()) {
-    const LottieImageAsset& image = _images[layer.image_index];
-    if (!image.image || image.width <= 0.0 || image.height <= 0.0)
+  auto paint_layer = [&](BLContext& dst_ctx, double local_opacity) -> bool {
+    if (local_opacity <= 0.0)
+      return false;
+
+    if (layer.root) {
+      render_group(*layer.root, dst_ctx, frame, layer_matrix, local_opacity, empty_trims);
+      return true;
+    }
+
+    if (layer.is_solid && layer.solid_width > 0.0 && layer.solid_height > 0.0) {
+      dst_ctx.save();
+      dst_ctx.apply_transform(layer_matrix);
+      const BLRgba32 color = make_rgba32(layer.solid_color, local_opacity);
+      if (color.a() != 0)
+        dst_ctx.fill_rect(BLRect(0.0, 0.0, layer.solid_width, layer.solid_height), color);
+      dst_ctx.restore();
+      return true;
+    }
+
+    if (layer.image_index >= 0 && size_t(layer.image_index) < _images.size()) {
+      const LottieImageAsset& image = _images[layer.image_index];
+      if (!image.image || image.width <= 0.0 || image.height <= 0.0)
+        return false;
+
+      dst_ctx.save();
+      dst_ctx.apply_transform(layer_matrix);
+      const double previous_alpha = dst_ctx.global_alpha();
+      dst_ctx.set_global_alpha(previous_alpha * local_opacity);
+      dst_ctx.blit_image(BLRect(0.0, 0.0, image.width, image.height), image.image);
+      dst_ctx.set_global_alpha(previous_alpha);
+      dst_ctx.restore();
+      return true;
+    }
+
+    if (layer.precomp_index >= 0 && size_t(layer.precomp_index) < _precomps.size()) {
+      const LottiePrecomposition& precomp = _precomps[layer.precomp_index];
+      render_layer_array(precomp.layers, dst_ctx, frame, layer_matrix, local_opacity);
+      return true;
+    }
+
+    return false;
+  };
+
+  if (!layer.masks.empty()) {
+    const BLSize target_size = ctx.target_size();
+    const int canvas_width = std::max(1, int(std::ceil(target_size.w)));
+    const int canvas_height = std::max(1, int(std::ceil(target_size.h)));
+
+    BLImage content;
+    if (content.create(canvas_width, canvas_height, BL_FORMAT_PRGB32) != BL_SUCCESS) {
+      paint_layer(ctx, opacity);
       return;
+    }
 
-    ctx.save();
-    ctx.apply_transform(layer_matrix);
-    const double previous_alpha = ctx.global_alpha();
-    ctx.set_global_alpha(previous_alpha * opacity);
-    ctx.blit_image(BLRect(0.0, 0.0, image.width, image.height), image.image);
-    ctx.set_global_alpha(previous_alpha);
-    ctx.restore();
+    bool painted = false;
+    {
+      BLContext content_ctx(content);
+      content_ctx.clear_all();
+      painted = paint_layer(content_ctx, opacity);
+    }
+
+    if (!painted) {
+      return;
+    }
+
+    BLImage coverage;
+    bool mask_applied = false;
+    if (coverage.create(canvas_width, canvas_height, BL_FORMAT_PRGB32) == BL_SUCCESS) {
+      BLContext mask_ctx(coverage);
+      mask_ctx.clear_all();
+
+      const bool has_positive_add = std::any_of(layer.masks.begin(), layer.masks.end(), [](const LottieMask& mask) {
+        return mask.mode == LottieMask::kAdd && !mask.inverted;
+      });
+
+      bool coverage_initialized = false;
+      if (!has_positive_add) {
+        mask_ctx.set_comp_op(BL_COMP_OP_SRC_COPY);
+        mask_ctx.fill_all(BLRgba32(255, 255, 255, 255));
+        coverage_initialized = true;
+      }
+
+      for (const LottieMask& mask : layer.masks) {
+        if (mask.mode == LottieMask::kUnknown)
+          continue;
+
+        double mask_opacity = std::clamp(mask.opacity.evaluate(frame) * 0.01, 0.0, 1.0);
+        if (mask_opacity <= 0.0)
+          continue;
+
+        const BLPath& mask_path_source = mask.path.path_at(frame);
+        if (mask_path_source.is_empty())
+          continue;
+
+        BLPath mask_path(mask_path_source);
+        mask_path.transform(layer_matrix);
+
+        const uint32_t alpha_byte = uint32_t(std::round(mask_opacity * 255.0));
+        mask_ctx.set_fill_style(BLRgba32(255, 255, 255, alpha_byte));
+
+        switch (mask.mode) {
+          case LottieMask::kAdd: {
+            if (mask.inverted && !coverage_initialized) {
+              mask_ctx.set_comp_op(BL_COMP_OP_SRC_COPY);
+              mask_ctx.fill_all(BLRgba32(255, 255, 255, 255));
+              coverage_initialized = true;
+            }
+            mask_ctx.set_comp_op(mask.inverted
+                                  ? BL_COMP_OP_DST_OUT
+                                  : (coverage_initialized ? BL_COMP_OP_SRC_OVER : BL_COMP_OP_SRC_COPY));
+            coverage_initialized = true;
+            break;
+          }
+
+          case LottieMask::kSubtract: {
+            if (!coverage_initialized) {
+              mask_ctx.set_comp_op(BL_COMP_OP_SRC_COPY);
+              mask_ctx.fill_all(BLRgba32(255, 255, 255, 255));
+              coverage_initialized = true;
+            }
+            mask_ctx.set_comp_op(mask.inverted
+                                  ? (coverage_initialized ? BL_COMP_OP_SRC_OVER : BL_COMP_OP_SRC_COPY)
+                                  : BL_COMP_OP_DST_OUT);
+            break;
+          }
+
+          case LottieMask::kIntersect: {
+            if (!coverage_initialized) {
+              mask_ctx.set_comp_op(BL_COMP_OP_SRC_COPY);
+              mask_ctx.fill_all(BLRgba32(255, 255, 255, 255));
+              coverage_initialized = true;
+            }
+            mask_ctx.set_comp_op(mask.inverted ? BL_COMP_OP_DST_OUT : BL_COMP_OP_DST_IN);
+            break;
+          }
+
+          default:
+            continue;
+        }
+
+        mask_ctx.fill_path(mask_path);
+        mask_applied = true;
+      }
+    }
+
+    if (mask_applied) {
+      BLContext content_ctx(content);
+      content_ctx.set_comp_op(BL_COMP_OP_DST_IN);
+      content_ctx.blit_image(BLPoint(0, 0), coverage);
+    }
+
+    ctx.blit_image(BLPoint(0, 0), content);
     return;
   }
 
-  if (layer.precomp_index >= 0 && size_t(layer.precomp_index) < _precomps.size()) {
-    const LottiePrecomposition& precomp = _precomps[layer.precomp_index];
-    render_layer_array(precomp.layers, ctx, frame, layer_matrix, opacity);
-  }
+  paint_layer(ctx, opacity);
 }
 
 double lottie_lerp(const double a, const double b, const double t) noexcept {
@@ -1709,6 +1909,8 @@ const BLPath& LottiePolystar::path_at(double frame) const {
   return cached_path;
 }
 
+LottieMask::LottieMask() = default;
+
 LottieFill::LottieFill()
   : LottieNode(LottieNode::kFill) {}
 
@@ -1913,6 +2115,27 @@ bool LottieComposition::load_from_file(const QString& path, QString* error_messa
       layer.out_point = layerObj.value(QLatin1String("op")).toDouble(_out_point);
       parse_transform_object(layerObj.value(QLatin1String("ks")).toObject(), layer.transform);
 
+      const QJsonArray masks_array = layerObj.value(QLatin1String("masksProperties")).toArray();
+      if (!masks_array.isEmpty()) {
+        layer.masks.reserve(masks_array.size());
+        for (const QJsonValue& mask_value : masks_array) {
+          if (!mask_value.isObject())
+            continue;
+          LottieMask mask {};
+          if (parse_mask(mask_value.toObject(), mask))
+            layer.masks.push_back(std::move(mask));
+        }
+      }
+
+      if (layer.type == 1) {
+        layer.solid_width = layerObj.value(QLatin1String("sw")).toDouble(0.0);
+        layer.solid_height = layerObj.value(QLatin1String("sh")).toDouble(0.0);
+        if (layer.solid_width > 0.0 && layer.solid_height > 0.0) {
+          layer.is_solid = true;
+          layer.solid_color = parse_hex_color(layerObj.value(QLatin1String("sc")).toString());
+        }
+      }
+
       if (layer.type == 4) {
         const QJsonArray shapes = layerObj.value(QLatin1String("shapes")).toArray();
         if (!shapes.isEmpty()) {
@@ -1988,7 +2211,8 @@ bool LottieComposition::load_from_file(const QString& path, QString* error_messa
   for (const LottieLayer& layer : _layers) {
     if ((layer.root && !layer.root->children.empty()) ||
         (layer.type == 2 && layer.image_index >= 0 && layer.image_index < int(_images.size())) ||
-        (layer.type == 0 && layer.precomp_index >= 0 && layer.precomp_index < int(_precomps.size()))) {
+        (layer.type == 0 && layer.precomp_index >= 0 && layer.precomp_index < int(_precomps.size())) ||
+        (layer.is_solid && layer.solid_width > 0.0 && layer.solid_height > 0.0)) {
       has_renderable_layer = true;
       break;
     }
@@ -2053,10 +2277,11 @@ void LottieComposition::render_layer_array(const std::vector<LottieLayer>& layer
   for (size_t i = layers.size(); i-- > 0;) {
     const LottieLayer& layer = layers[i];
     const bool has_vector = layer.root != nullptr;
+    const bool has_solid = layer.is_solid && layer.solid_width > 0.0 && layer.solid_height > 0.0;
     const bool has_image = layer.image_index >= 0 && size_t(layer.image_index) < _images.size();
     const bool has_precomp = layer.precomp_index >= 0 && size_t(layer.precomp_index) < _precomps.size();
     const bool has_matte_target = layer.matte_source >= 0 && layer.matte_mode > 0;
-    if (!has_vector && !has_image && !has_precomp && !has_matte_target)
+    if (!has_vector && !has_solid && !has_image && !has_precomp && !has_matte_target)
       continue;
 
     if (layer.hidden && !has_matte_target)
