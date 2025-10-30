@@ -23,7 +23,7 @@ struct LottieColor {
   double a {1.0};
 };
 
-double lottie_lerp(double a, double b, double t) noexcept;
+double lottie_lerp(const double a, const double b, const double t) noexcept;
 LottieVec2 lottie_lerp(const LottieVec2& a, const LottieVec2& b, double t) noexcept;
 LottieColor lottie_lerp(const LottieColor& a, const LottieColor& b, double t) noexcept;
 BLMatrix2D lottie_matrix_multiply(const BLMatrix2D& a, const BLMatrix2D& b) noexcept;

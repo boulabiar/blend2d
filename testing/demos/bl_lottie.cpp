@@ -34,7 +34,7 @@ double to_double(const QJsonValue& value, double fallback) noexcept {
   if (value.isDouble())
     return value.toDouble();
   if (value.isArray()) {
-    QJsonArray arr = value.toArray();
+    const QJsonArray arr = value.toArray();
     if (!arr.isEmpty())
       return arr.first().toDouble(fallback);
   }
@@ -45,7 +45,7 @@ LottieVec2 to_vec2(const QJsonValue& value, const LottieVec2& fallback) noexcept
   if (!value.isArray())
     return fallback;
 
-  QJsonArray arr = value.toArray();
+  const QJsonArray arr = value.toArray();
   if (arr.size() < 2)
     return fallback;
 
@@ -59,7 +59,7 @@ LottieColor to_color(const QJsonValue& value, const LottieColor& fallback) noexc
   if (!value.isArray())
     return fallback;
 
-  QJsonArray arr = value.toArray();
+  const QJsonArray arr = value.toArray();
   if (arr.size() < 3)
     return fallback;
 
@@ -81,25 +81,25 @@ void parse_animated_double(const QJsonValue& value, LottieAnimatedValue<double>&
     return;
   }
 
-  QJsonObject obj = value.toObject();
-  int animated = obj.value(QLatin1String("a")).toInt();
+  const QJsonObject obj = value.toObject();
+  const int animated = obj.value(QLatin1String("a")).toInt();
   if (!animated) {
     dst.value = obj.value(QLatin1String("k")).toDouble(fallback);
     return;
   }
 
-  QJsonArray frames = obj.value(QLatin1String("k")).toArray();
+  const QJsonArray frames = obj.value(QLatin1String("k")).toArray();
   dst.animated = true;
   dst.keyframes.reserve(frames.size());
   for (const QJsonValue& entry : frames) {
     if (!entry.isObject())
       continue;
-    QJsonObject key = entry.toObject();
-    double time = key.value(QLatin1String("t")).toDouble();
+    const QJsonObject key = entry.toObject();
+    const double time = key.value(QLatin1String("t")).toDouble();
     double number = fallback;
-    QJsonValue sValue = key.value(QLatin1String("s"));
+    const QJsonValue sValue = key.value(QLatin1String("s"));
     if (sValue.isArray()) {
-      QJsonArray arr = sValue.toArray();
+      const QJsonArray arr = sValue.toArray();
       if (!arr.isEmpty())
         number = arr.first().toDouble(fallback);
     }
@@ -128,23 +128,23 @@ void parse_animated_vec2(const QJsonValue& value, LottieAnimatedValue<LottieVec2
     return;
   }
 
-  QJsonObject obj = value.toObject();
-  int animated = obj.value(QLatin1String("a")).toInt();
+  const QJsonObject obj = value.toObject();
+  const int animated = obj.value(QLatin1String("a")).toInt();
   if (!animated) {
     dst.value = to_vec2(obj.value(QLatin1String("k")), fallback);
     return;
   }
 
-  QJsonArray frames = obj.value(QLatin1String("k")).toArray();
+  const QJsonArray frames = obj.value(QLatin1String("k")).toArray();
   dst.animated = true;
   dst.keyframes.reserve(frames.size());
   for (const QJsonValue& entry : frames) {
     if (!entry.isObject())
       continue;
-    QJsonObject key = entry.toObject();
-    double time = key.value(QLatin1String("t")).toDouble();
+    const QJsonObject key = entry.toObject();
+    const double time = key.value(QLatin1String("t")).toDouble();
     LottieVec2 vec = fallback;
-    QJsonValue sval = key.value(QLatin1String("s"));
+    const QJsonValue sval = key.value(QLatin1String("s"));
     vec = to_vec2(sval, fallback);
     dst.keyframes.push_back({time, vec});
   }
@@ -168,22 +168,22 @@ void parse_animated_color(const QJsonValue& value, LottieAnimatedValue<LottieCol
     return;
   }
 
-  QJsonObject obj = value.toObject();
-  int animated = obj.value(QLatin1String("a")).toInt();
+  const QJsonObject obj = value.toObject();
+  const int animated = obj.value(QLatin1String("a")).toInt();
   if (!animated) {
     dst.value = to_color(obj.value(QLatin1String("k")), fallback);
     return;
   }
 
-  QJsonArray frames = obj.value(QLatin1String("k")).toArray();
+  const QJsonArray frames = obj.value(QLatin1String("k")).toArray();
   dst.animated = true;
   dst.keyframes.reserve(frames.size());
   for (const QJsonValue& entry : frames) {
     if (!entry.isObject())
       continue;
-    QJsonObject key = entry.toObject();
-    double time = key.value(QLatin1String("t")).toDouble();
-    LottieColor color = to_color(key.value(QLatin1String("s")), fallback);
+    const QJsonObject key = entry.toObject();
+    const double time = key.value(QLatin1String("t")).toDouble();
+    const LottieColor color = to_color(key.value(QLatin1String("s")), fallback);
     dst.keyframes.push_back({time, color});
   }
 
@@ -207,12 +207,12 @@ void parse_transform_object(const QJsonObject& obj, LottieTransform& transform) 
 }
 
 bool parse_shape_data(const QJsonObject& data, LottieShapePath::ShapeData& dst) {
-  QJsonArray vertices = data.value(QLatin1String("v")).toArray();
-  QJsonArray in_tangents = data.value(QLatin1String("i")).toArray();
-  QJsonArray out_tangents = data.value(QLatin1String("o")).toArray();
-  bool closed = data.value(QLatin1String("c")).toBool(false);
+  const QJsonArray vertices = data.value(QLatin1String("v")).toArray();
+  const QJsonArray in_tangents = data.value(QLatin1String("i")).toArray();
+  const QJsonArray out_tangents = data.value(QLatin1String("o")).toArray();
+  const bool closed = data.value(QLatin1String("c")).toBool(false);
 
-  int count = vertices.size();
+  const int count = vertices.size();
   if (count == 0)
     return false;
 
@@ -244,7 +244,7 @@ bool parse_shape_data(const QJsonObject& data, LottieShapePath::ShapeData& dst) 
 
 BLPath build_path_from_shape(const LottieShapePath::ShapeData& shape) {
   BLPath path;
-  size_t count = shape.vertices.size();
+  const size_t count = shape.vertices.size();
   if (count == 0)
     return path;
 
@@ -283,14 +283,14 @@ BLPath build_path_from_shape(const LottieShapePath::ShapeData& shape) {
 }
 
 std::unique_ptr<LottieShapePath> parse_shape_path(const QJsonObject& obj) {
-  QJsonObject ks = obj.value(QLatin1String("ks")).toObject();
+  const QJsonObject ks = obj.value(QLatin1String("ks")).toObject();
 
   auto extract_path_object = [](const QJsonValue& value) -> QJsonObject {
     if (value.isObject())
       return value.toObject();
 
     if (value.isArray()) {
-      QJsonArray arr = value.toArray();
+      const QJsonArray arr = value.toArray();
       if (!arr.isEmpty() && arr.first().isObject())
         return arr.first().toObject();
     }
@@ -299,10 +299,10 @@ std::unique_ptr<LottieShapePath> parse_shape_path(const QJsonObject& obj) {
   };
 
   auto path = std::make_unique<LottieShapePath>();
-  int animated = ks.value(QLatin1String("a")).toInt();
+  const int animated = ks.value(QLatin1String("a")).toInt();
 
   if (!animated) {
-    QJsonObject data = extract_path_object(ks.value(QLatin1String("k")));
+    const QJsonObject data = extract_path_object(ks.value(QLatin1String("k")));
     if (data.isEmpty())
       return nullptr;
 
@@ -314,12 +314,12 @@ std::unique_ptr<LottieShapePath> parse_shape_path(const QJsonObject& obj) {
     return path;
   }
 
-  QJsonArray frames = ks.value(QLatin1String("k")).toArray();
+  const QJsonArray frames = ks.value(QLatin1String("k")).toArray();
   for (const QJsonValue& entry : frames) {
     if (!entry.isObject())
       continue;
-    QJsonObject key = entry.toObject();
-    QJsonObject data = extract_path_object(key.value(QLatin1String("s")));
+    const QJsonObject key = entry.toObject();
+    const QJsonObject data = extract_path_object(key.value(QLatin1String("s")));
     if (data.isEmpty())
       continue;
 
@@ -335,7 +335,7 @@ std::unique_ptr<LottieShapePath> parse_shape_path(const QJsonObject& obj) {
   }
 
   if (path->keyframes.empty()) {
-    QJsonObject data = extract_path_object(ks.value(QLatin1String("k")));
+    const QJsonObject data = extract_path_object(ks.value(QLatin1String("k")));
     if (data.isEmpty())
       return nullptr;
 
@@ -358,9 +358,9 @@ std::unique_ptr<LottieShapePath> parse_shape_path(const QJsonObject& obj) {
 }
 
 std::unique_ptr<LottieShapePath> parse_rectangle(const QJsonObject& obj) {
-  QJsonObject posObj = obj.value(QLatin1String("p")).toObject();
-  QJsonObject sizeObj = obj.value(QLatin1String("s")).toObject();
-  QJsonObject radiusObj = obj.value(QLatin1String("r")).toObject();
+  const QJsonObject posObj = obj.value(QLatin1String("p")).toObject();
+  const QJsonObject sizeObj = obj.value(QLatin1String("s")).toObject();
+  const QJsonObject radiusObj = obj.value(QLatin1String("r")).toObject();
 
   if (posObj.value(QLatin1String("a")).toInt() != 0)
     return nullptr;
@@ -369,29 +369,29 @@ std::unique_ptr<LottieShapePath> parse_rectangle(const QJsonObject& obj) {
   if (radiusObj.value(QLatin1String("a")).toInt() != 0)
     return nullptr;
 
-  QJsonArray posArr = posObj.value(QLatin1String("k")).toArray();
-  QJsonArray sizeArr = sizeObj.value(QLatin1String("k")).toArray();
+  const QJsonArray posArr = posObj.value(QLatin1String("k")).toArray();
+  const QJsonArray sizeArr = sizeObj.value(QLatin1String("k")).toArray();
   if (posArr.size() < 2 || sizeArr.size() < 2)
     return nullptr;
 
-  double px = posArr.at(0).toDouble();
-  double py = posArr.at(1).toDouble();
-  double sx = sizeArr.at(0).toDouble();
-  double sy = sizeArr.at(1).toDouble();
-  double radius = radiusObj.value(QLatin1String("k")).toDouble(0.0);
+  const double px = posArr.at(0).toDouble();
+  const double py = posArr.at(1).toDouble();
+  const double sx = sizeArr.at(0).toDouble();
+  const double sy = sizeArr.at(1).toDouble();
+  const double radius = radiusObj.value(QLatin1String("k")).toDouble(0.0);
 
-  double x = px - sx * 0.5;
-  double y = py - sy * 0.5;
+  const double x = px - sx * 0.5;
+  const double y = py - sy * 0.5;
 
   auto path = std::make_unique<LottieShapePath>();
-  BLGeometryDirection direction = obj.value(QLatin1String("d")).toInt(1) == 1 ? BL_GEOMETRY_DIRECTION_CW : BL_GEOMETRY_DIRECTION_CCW;
+  const BLGeometryDirection direction = obj.value(QLatin1String("d")).toInt(1) == 1 ? BL_GEOMETRY_DIRECTION_CW : BL_GEOMETRY_DIRECTION_CCW;
 
   BLPath built;
   if (radius <= 0.0) {
     built.add_rect(x, y, sx, sy, direction);
   }
   else {
-    double clamped = std::min(radius, std::min(std::abs(sx), std::abs(sy)) * 0.5);
+    const double clamped = std::min(radius, std::min(std::abs(sx), std::abs(sy)) * 0.5);
     BLRoundRect rr(x, y, sx, sy, clamped, clamped);
     built.add_round_rect(rr, direction);
   }
@@ -403,26 +403,26 @@ std::unique_ptr<LottieShapePath> parse_rectangle(const QJsonObject& obj) {
 }
 
 std::unique_ptr<LottieShapePath> parse_ellipse(const QJsonObject& obj) {
-  QJsonObject posObj = obj.value(QLatin1String("p")).toObject();
-  QJsonObject sizeObj = obj.value(QLatin1String("s")).toObject();
+  const QJsonObject posObj = obj.value(QLatin1String("p")).toObject();
+  const QJsonObject sizeObj = obj.value(QLatin1String("s")).toObject();
 
   if (posObj.value(QLatin1String("a")).toInt() != 0)
     return nullptr;
   if (sizeObj.value(QLatin1String("a")).toInt() != 0)
     return nullptr;
 
-  QJsonArray posArr = posObj.value(QLatin1String("k")).toArray();
-  QJsonArray sizeArr = sizeObj.value(QLatin1String("k")).toArray();
+  const QJsonArray posArr = posObj.value(QLatin1String("k")).toArray();
+  const QJsonArray sizeArr = sizeObj.value(QLatin1String("k")).toArray();
   if (posArr.size() < 2 || sizeArr.size() < 2)
     return nullptr;
 
-  double cx = posArr.at(0).toDouble();
-  double cy = posArr.at(1).toDouble();
-  double rx = sizeArr.at(0).toDouble() * 0.5;
-  double ry = sizeArr.at(1).toDouble() * 0.5;
+  const double cx = posArr.at(0).toDouble();
+  const double cy = posArr.at(1).toDouble();
+  const double rx = sizeArr.at(0).toDouble() * 0.5;
+  const double ry = sizeArr.at(1).toDouble() * 0.5;
 
   auto path = std::make_unique<LottieShapePath>();
-  BLGeometryDirection direction = obj.value(QLatin1String("d")).toInt(1) == 1 ? BL_GEOMETRY_DIRECTION_CW : BL_GEOMETRY_DIRECTION_CCW;
+  const BLGeometryDirection direction = obj.value(QLatin1String("d")).toInt(1) == 1 ? BL_GEOMETRY_DIRECTION_CW : BL_GEOMETRY_DIRECTION_CCW;
 
   BLPath built;
   built.add_ellipse(BLEllipse(cx, cy, rx, ry), direction);
@@ -442,22 +442,22 @@ std::unique_ptr<LottieGradientFill> parse_gradient_fill(const QJsonObject& obj) 
   parse_animated_vec2(obj.value(QLatin1String("e")), fill->end, LottieVec2{0.0, 0.0});
   parse_animated_double(obj.value(QLatin1String("o")), fill->opacity, 100.0);
 
-  QJsonObject grad = obj.value(QLatin1String("g")).toObject();
-  int stop_count = grad.value(QLatin1String("p")).toInt();
-  QJsonValue stops_value = grad.value(QLatin1String("k"));
+  const QJsonObject grad = obj.value(QLatin1String("g")).toObject();
+  const int stop_count = grad.value(QLatin1String("p")).toInt();
+  const QJsonValue stops_value = grad.value(QLatin1String("k"));
 
   auto extract_gradient_values = [](const QJsonValue& value) -> QJsonArray {
     if (value.isObject()) {
-      QJsonObject obj = value.toObject();
+      const QJsonObject obj = value.toObject();
       if (obj.value(QLatin1String("a")).toInt() == 0)
         return obj.value(QLatin1String("k")).toArray();
 
-      QJsonArray frames = obj.value(QLatin1String("k")).toArray();
+      const QJsonArray frames = obj.value(QLatin1String("k")).toArray();
       for (const QJsonValue& frameValue : frames) {
         if (!frameValue.isObject())
           continue;
-        QJsonObject frameObj = frameValue.toObject();
-        QJsonArray components = frameObj.value(QLatin1String("s")).toArray();
+        const QJsonObject frameObj = frameValue.toObject();
+        const QJsonArray components = frameObj.value(QLatin1String("s")).toArray();
         if (!components.isEmpty() && components.first().isArray())
           return components.first().toArray();
         if (!components.isEmpty())
@@ -472,12 +472,12 @@ std::unique_ptr<LottieGradientFill> parse_gradient_fill(const QJsonObject& obj) 
     return QJsonArray();
   };
 
-  QJsonArray values = extract_gradient_values(stops_value);
+  const QJsonArray values = extract_gradient_values(stops_value);
   if (values.isEmpty())
     return nullptr;
 
-  qsizetype value_count = values.size();
-  int derived_stop_count = int(value_count / 4);
+  const qsizetype value_count = values.size();
+  const int derived_stop_count = int(value_count / 4);
   int color_stop_count = stop_count > 0 ? std::min(stop_count, derived_stop_count) : derived_stop_count;
 
   if (color_stop_count < 0)
@@ -571,7 +571,7 @@ std::unique_ptr<LottieStroke> parse_stroke(const QJsonObject& obj) {
 std::unique_ptr<LottieGroup> parse_group(const QJsonObject& obj);
 
 std::unique_ptr<LottieNode> parse_shape_item(const QJsonObject& obj) {
-  QString type = obj.value(QLatin1String("ty")).toString();
+  const QString type = obj.value(QLatin1String("ty")).toString();
 
   if (type == QLatin1String("gr"))
     return parse_group(obj);
@@ -599,13 +599,13 @@ std::unique_ptr<LottieNode> parse_shape_item(const QJsonObject& obj) {
 
 std::unique_ptr<LottieGroup> parse_group(const QJsonObject& obj) {
   auto group = std::make_unique<LottieGroup>();
-  QJsonArray items = obj.value(QLatin1String("it")).toArray();
+  const QJsonArray items = obj.value(QLatin1String("it")).toArray();
 
   for (const QJsonValue& itemValue : items) {
     if (!itemValue.isObject())
       continue;
-    QJsonObject itemObj = itemValue.toObject();
-    QString type = itemObj.value(QLatin1String("ty")).toString();
+    const QJsonObject itemObj = itemValue.toObject();
+    const QString type = itemObj.value(QLatin1String("ty")).toString();
     if (type == QLatin1String("tr")) {
       parse_transform_object(itemObj, group->transform);
       continue;
@@ -626,15 +626,15 @@ BLRgba32 make_rgba32(const LottieColor& color, double alpha_scale) noexcept {
     return v;
   };
 
-  double alpha = clamp_unit(color.a * alpha_scale);
-  double r = clamp_unit(color.r);
-  double g = clamp_unit(color.g);
-  double b = clamp_unit(color.b);
+  const double alpha = clamp_unit(color.a * alpha_scale);
+  const double r = clamp_unit(color.r);
+  const double g = clamp_unit(color.g);
+  const double b = clamp_unit(color.b);
 
-  uint32_t ri = uint32_t(std::round(r * 255.0));
-  uint32_t gi = uint32_t(std::round(g * 255.0));
-  uint32_t bi = uint32_t(std::round(b * 255.0));
-  uint32_t ai = uint32_t(std::round(alpha * 255.0));
+  const uint32_t ri = uint32_t(std::round(r * 255.0));
+  const uint32_t gi = uint32_t(std::round(g * 255.0));
+  const uint32_t bi = uint32_t(std::round(b * 255.0));
+  const uint32_t ai = uint32_t(std::round(alpha * 255.0));
 
   return BLRgba32(ri, gi, bi, ai);
 }
@@ -658,11 +658,11 @@ BLStrokeJoin map_stroke_join(int join) noexcept {
 void render_group(const LottieGroup& group, BLContext& ctx, double frame, const BLMatrix2D& parent_matrix, double opacity);
 
 void render_group(const LottieGroup& group, BLContext& ctx, double frame, const BLMatrix2D& parent_matrix, double opacity) {
-  double local_opacity = opacity * group.transform.opacity_at(frame);
+  const double local_opacity = opacity * group.transform.opacity_at(frame);
   if (local_opacity <= 0.0)
     return;
 
-  BLMatrix2D matrix = lottie_matrix_multiply(parent_matrix, group.transform.matrix(frame));
+  const BLMatrix2D matrix = lottie_matrix_multiply(parent_matrix, group.transform.matrix(frame));
   std::vector<const LottieShapePath*> path_stack;
   path_stack.reserve(8);
   bool path_consumed = false;
@@ -748,12 +748,12 @@ void render_group(const LottieGroup& group, BLContext& ctx, double frame, const 
 
       case LottieNode::kFill: {
         const LottieFill& fill = static_cast<const LottieFill&>(*child);
-        double style_opacity = fill.opacity.evaluate(frame) * 0.01;
-        double final_opacity = local_opacity * style_opacity;
+        const double style_opacity = fill.opacity.evaluate(frame) * 0.01;
+        const double final_opacity = local_opacity * style_opacity;
         if (final_opacity > 0.0 && !path_stack.empty()) {
-          LottieColor color = fill.color.evaluate(frame);
-          BLRgba32 rgba = make_rgba32(color, final_opacity);
-          BLFillRule rule = fill.fill_rule == 2 ? BL_FILL_RULE_EVEN_ODD : BL_FILL_RULE_NON_ZERO;
+          const LottieColor color = fill.color.evaluate(frame);
+          const BLRgba32 rgba = make_rgba32(color, final_opacity);
+          const BLFillRule rule = fill.fill_rule == 2 ? BL_FILL_RULE_EVEN_ODD : BL_FILL_RULE_NON_ZERO;
 
           BLPath combined;
           for (const LottieShapePath* path : path_stack) {
@@ -776,14 +776,14 @@ void render_group(const LottieGroup& group, BLContext& ctx, double frame, const 
 
       case LottieNode::kGradientFill: {
         const LottieGradientFill& gradient = static_cast<const LottieGradientFill&>(*child);
-        double style_opacity = gradient.opacity.evaluate(frame) * 0.01;
-        double final_opacity = local_opacity * style_opacity;
+        const double style_opacity = gradient.opacity.evaluate(frame) * 0.01;
+        const double final_opacity = local_opacity * style_opacity;
         if (final_opacity > 0.0 && !path_stack.empty() && !gradient.stops.empty()) {
-          LottieVec2 start = gradient.start.evaluate(frame);
-          LottieVec2 end = gradient.end.evaluate(frame);
+          const LottieVec2 start = gradient.start.evaluate(frame);
+          const LottieVec2 end = gradient.end.evaluate(frame);
 
-          BLPoint p0 = matrix.map_point(start.x, start.y);
-          BLPoint p1 = matrix.map_point(end.x, end.y);
+          const BLPoint p0 = matrix.map_point(start.x, start.y);
+          const BLPoint p1 = matrix.map_point(end.x, end.y);
 
           BLGradient bl_gradient;
           if (gradient.gradient_type == 2) {
@@ -797,11 +797,11 @@ void render_group(const LottieGroup& group, BLContext& ctx, double frame, const 
           }
 
           for (const LottieGradientStop& stop : gradient.stops) {
-            BLRgba32 rgba = make_rgba32(stop.color, final_opacity);
+            const BLRgba32 rgba = make_rgba32(stop.color, final_opacity);
             bl_gradient.add_stop(stop.offset, rgba);
           }
 
-          BLFillRule rule = gradient.fill_rule == 2 ? BL_FILL_RULE_EVEN_ODD : BL_FILL_RULE_NON_ZERO;
+          const BLFillRule rule = gradient.fill_rule == 2 ? BL_FILL_RULE_EVEN_ODD : BL_FILL_RULE_NON_ZERO;
           BLPath combined;
           for (const LottieShapePath* path : path_stack) {
             if (!path)
@@ -823,16 +823,16 @@ void render_group(const LottieGroup& group, BLContext& ctx, double frame, const 
 
       case LottieNode::kStroke: {
         const LottieStroke& stroke = static_cast<const LottieStroke&>(*child);
-        double style_opacity = stroke.opacity.evaluate(frame) * 0.01;
-        double final_opacity = local_opacity * style_opacity;
+        const double style_opacity = stroke.opacity.evaluate(frame) * 0.01;
+        const double final_opacity = local_opacity * style_opacity;
         if (final_opacity > 0.0 && !path_stack.empty()) {
-          double width = stroke.width.evaluate(frame);
-          BLStrokeCap cap = map_stroke_cap(stroke.cap);
-          BLStrokeJoin join = map_stroke_join(stroke.join);
-          double miter_limit = stroke.miter_limit;
+          const double width = stroke.width.evaluate(frame);
+          const BLStrokeCap cap = map_stroke_cap(stroke.cap);
+          const BLStrokeJoin join = map_stroke_join(stroke.join);
+          const double miter_limit = stroke.miter_limit;
 
-          LottieColor color = stroke.color.evaluate(frame);
-          BLRgba32 rgba = make_rgba32(color, final_opacity);
+          const LottieColor color = stroke.color.evaluate(frame);
+          const BLRgba32 rgba = make_rgba32(color, final_opacity);
 
           BLPath combined;
           for (const LottieShapePath* path : path_stack) {
@@ -905,7 +905,7 @@ void LottieComposition::render_layer_content(const LottieLayer& layer,
 
     ctx.save();
     ctx.apply_transform(layer_matrix);
-    double previous_alpha = ctx.global_alpha();
+    const double previous_alpha = ctx.global_alpha();
     ctx.set_global_alpha(previous_alpha * opacity);
     ctx.blit_image(BLRect(0.0, 0.0, image.width, image.height), image.image);
     ctx.set_global_alpha(previous_alpha);
@@ -919,7 +919,7 @@ void LottieComposition::render_layer_content(const LottieLayer& layer,
   }
 }
 
-double lottie_lerp(double a, double b, double t) noexcept {
+double lottie_lerp(const double a, const double b, const double t) noexcept {
   return a + (b - a) * t;
 }
 
@@ -985,12 +985,12 @@ const BLPath& LottieShapePath::path_at(double frame) const {
           shape_ptr = &k0.shape;
         }
         else {
-          double denom = k1.time - k0.time;
+          const double denom = k1.time - k0.time;
           double t = denom != 0.0 ? (frame - k0.time) / denom : 0.0;
           if (t < 0.0) t = 0.0;
           if (t > 1.0) t = 1.0;
 
-          size_t count = k0.shape.vertices.size();
+          const size_t count = k0.shape.vertices.size();
           interpolated_shape.vertices.resize(count);
           interpolated_shape.in_tangents.resize(count);
           interpolated_shape.out_tangents.resize(count);
@@ -1028,22 +1028,22 @@ LottieGroup::LottieGroup()
   : LottieNode(LottieNode::kGroup) {}
 
 BLMatrix2D LottieTransform::matrix(double frame) const {
-  LottieVec2 pos = position.evaluate(frame);
-  LottieVec2 scl = scale.evaluate(frame);
-  LottieVec2 anc = anchor.evaluate(frame);
-  double angle = rotation.evaluate(frame) * (kPi / 180.0);
-  double skew_angle = skew.evaluate(frame) * (kPi / 180.0);
-  double skew_axis_angle = (this->skew_axis.evaluate(frame) + 90.0) * (kPi / 180.0);
+  const LottieVec2 pos = position.evaluate(frame);
+  const LottieVec2 scl = scale.evaluate(frame);
+  const LottieVec2 anc = anchor.evaluate(frame);
+  const double angle = rotation.evaluate(frame) * (kPi / 180.0);
+  const double skew_angle = skew.evaluate(frame) * (kPi / 180.0);
+  const double skew_axis_angle = (this->skew_axis.evaluate(frame) + 90.0) * (kPi / 180.0);
 
   BLMatrix2D result = BLMatrix2D::make_identity();
   result = lottie_matrix_multiply(result, BLMatrix2D::make_translation(pos.x, pos.y));
   if (angle != 0.0)
     result = lottie_matrix_multiply(result, BLMatrix2D::make_rotation(angle));
   if (skew_angle != 0.0) {
-    double tan_skew = std::tan(skew_angle);
-    BLMatrix2D rot = BLMatrix2D::make_rotation(skew_axis_angle);
-    BLMatrix2D rot_inv = BLMatrix2D::make_rotation(-skew_axis_angle);
-    BLMatrix2D shear(1.0, 0.0, tan_skew, 1.0, 0.0, 0.0);
+    const double tan_skew = std::tan(skew_angle);
+    const BLMatrix2D rot = BLMatrix2D::make_rotation(skew_axis_angle);
+    const BLMatrix2D rot_inv = BLMatrix2D::make_rotation(-skew_axis_angle);
+    const BLMatrix2D shear(1.0, 0.0, tan_skew, 1.0, 0.0, 0.0);
     result = lottie_matrix_multiply(result, rot);
     result = lottie_matrix_multiply(result, shear);
     result = lottie_matrix_multiply(result, rot_inv);
@@ -1069,16 +1069,16 @@ bool LottieComposition::load_from_file(const QString& path, QString* error_messa
     return false;
   }
 
-  QByteArray data = file.readAll();
+  const QByteArray data = file.readAll();
   QJsonParseError parse_error {};
-  QJsonDocument doc = QJsonDocument::fromJson(data, &parse_error);
+  const QJsonDocument doc = QJsonDocument::fromJson(data, &parse_error);
   if (doc.isNull()) {
     if (error_message)
       *error_message = QString::fromLatin1("Failed to parse Lottie JSON: %1").arg(parse_error.errorString());
     return false;
   }
 
-  QJsonObject root = doc.object();
+  const QJsonObject root = doc.object();
   _width = root.value(QLatin1String("w")).toDouble(0.0);
   _height = root.value(QLatin1String("h")).toDouble(0.0);
   _frame_rate = root.value(QLatin1String("fr")).toDouble(60.0);
@@ -1091,36 +1091,36 @@ bool LottieComposition::load_from_file(const QString& path, QString* error_messa
 
   QHash<QString, int> image_index_map;
 
-  QJsonArray assets = root.value(QLatin1String("assets")).toArray();
-  QDir file_dir = QFileInfo(path).dir();
+  const QJsonArray assets = root.value(QLatin1String("assets")).toArray();
+  const QDir file_dir = QFileInfo(path).dir();
   _images.reserve(assets.size());
 
   auto load_image_asset = [&](const QJsonObject& asset_obj) -> void {
-    QString id = asset_obj.value(QLatin1String("id")).toString();
+    const QString id = asset_obj.value(QLatin1String("id")).toString();
     if (id.isEmpty())
       return;
 
-    QString file_name = asset_obj.value(QLatin1String("p")).toString();
+    const QString file_name = asset_obj.value(QLatin1String("p")).toString();
     if (file_name.isEmpty())
       return;
 
-    int embed = asset_obj.value(QLatin1String("e")).toInt();
+    const int embed = asset_obj.value(QLatin1String("e")).toInt();
     BLImage image;
     bool loaded = false;
 
     if (embed == 1 || file_name.startsWith(QLatin1String("data:"))) {
       QString data_str = file_name;
-      int comma_pos = data_str.indexOf(QLatin1Char(','));
+      const int comma_pos = data_str.indexOf(QLatin1Char(','));
       if (comma_pos >= 0)
         data_str = data_str.mid(comma_pos + 1);
-      QByteArray decoded = QByteArray::fromBase64(data_str.toUtf8());
+      const QByteArray decoded = QByteArray::fromBase64(data_str.toUtf8());
       if (!decoded.isEmpty())
         loaded = image.read_from_data(decoded.constData(), size_t(decoded.size())) == BL_SUCCESS;
     }
     else {
-      QString base_path = asset_obj.value(QLatin1String("u")).toString();
-      QString absolute_path = file_dir.absoluteFilePath(base_path + file_name);
-      QByteArray encoded = QFile::encodeName(absolute_path);
+      const QString base_path = asset_obj.value(QLatin1String("u")).toString();
+      const QString absolute_path = file_dir.absoluteFilePath(base_path + file_name);
+      const QByteArray encoded = QFile::encodeName(absolute_path);
       loaded = image.read_from_file(encoded.constData()) == BL_SUCCESS;
     }
 
@@ -1139,7 +1139,7 @@ bool LottieComposition::load_from_file(const QString& path, QString* error_messa
   for (const QJsonValue& assetValue : assets) {
     if (!assetValue.isObject())
       continue;
-    QJsonObject assetObj = assetValue.toObject();
+    const QJsonObject assetObj = assetValue.toObject();
     if (assetObj.contains(QLatin1String("p")))
       load_image_asset(assetObj);
   }
@@ -1148,20 +1148,20 @@ bool LottieComposition::load_from_file(const QString& path, QString* error_messa
     QHash<int, int> index_map;
     index_map.reserve(int(layers.size()));
     for (int i = 0; i < int(layers.size()); i++) {
-      int layer_index = layers[size_t(i)].index;
+      const int layer_index = layers[size_t(i)].index;
       index_map.insert(layer_index, i);
     }
 
     for (LottieLayer& layer : layers) {
       if (layer.parent_index < 0)
         continue;
-      auto it = index_map.constFind(layer.parent_index);
+      const auto it = index_map.constFind(layer.parent_index);
       if (it != index_map.constEnd())
         layer.parent = *it;
     }
   };
 
-    auto assign_track_mattes = [](std::vector<LottieLayer>& layers) {
+  auto assign_track_mattes = [](std::vector<LottieLayer>& layers) {
     int pending = -1;
     int pending_mode = 0;
     for (size_t i = 0; i < layers.size(); ++i) {
@@ -1189,14 +1189,14 @@ bool LottieComposition::load_from_file(const QString& path, QString* error_messa
     }
   };
 
-auto parse_layer_array = [&](const QJsonArray& layer_array, std::vector<LottieLayer>& target) {
+  auto parse_layer_array = [&](const QJsonArray& layer_array, std::vector<LottieLayer>& target) {
     target.clear();
     target.reserve(layer_array.size());
 
     for (const QJsonValue& layerValue : layer_array) {
       if (!layerValue.isObject())
         continue;
-      QJsonObject layerObj = layerValue.toObject();
+      const QJsonObject layerObj = layerValue.toObject();
 
       LottieLayer layer {};
       layer.type = layerObj.value(QLatin1String("ty")).toInt();
@@ -1217,7 +1217,7 @@ auto parse_layer_array = [&](const QJsonArray& layer_array, std::vector<LottieLa
       parse_transform_object(layerObj.value(QLatin1String("ks")).toObject(), layer.transform);
 
       if (layer.type == 4) {
-        QJsonArray shapes = layerObj.value(QLatin1String("shapes")).toArray();
+        const QJsonArray shapes = layerObj.value(QLatin1String("shapes")).toArray();
         if (!shapes.isEmpty()) {
           auto root_group = std::make_unique<LottieGroup>();
           for (const QJsonValue& shapeValue : shapes) {
@@ -1245,12 +1245,12 @@ auto parse_layer_array = [&](const QJsonArray& layer_array, std::vector<LottieLa
       layer.precomp_index = -1;
 
       if (layer.type == 2 && !layer.ref_id.isEmpty()) {
-        auto it = local_image_map.constFind(layer.ref_id);
+        const auto it = local_image_map.constFind(layer.ref_id);
         if (it != local_image_map.constEnd())
           layer.image_index = *it;
       }
       else if (layer.type == 0 && !layer.ref_id.isEmpty()) {
-        auto it = local_precomp_map.constFind(layer.ref_id);
+        const auto it = local_precomp_map.constFind(layer.ref_id);
         if (it != local_precomp_map.constEnd())
           layer.precomp_index = *it;
       }
@@ -1262,7 +1262,7 @@ auto parse_layer_array = [&](const QJsonArray& layer_array, std::vector<LottieLa
   for (const QJsonValue& assetValue : assets) {
     if (!assetValue.isObject())
       continue;
-    QJsonObject assetObj = assetValue.toObject();
+    const QJsonObject assetObj = assetValue.toObject();
     if (!assetObj.contains(QLatin1String("layers")))
       continue;
 
@@ -1282,7 +1282,7 @@ auto parse_layer_array = [&](const QJsonArray& layer_array, std::vector<LottieLa
     assign_track_mattes(precomp.layers);
   }
 
-  QJsonArray layers = root.value(QLatin1String("layers")).toArray();
+  const QJsonArray layers = root.value(QLatin1String("layers")).toArray();
   parse_layer_array(layers, _layers);
   resolve_layer_resources(_layers, image_index_map, precomp_index_map);
   assign_track_mattes(_layers);
@@ -1318,9 +1318,9 @@ void LottieComposition::render_layer_array(const std::vector<LottieLayer>& layer
   if (layers.empty())
     return;
 
-  BLSize target_size = ctx.target_size();
-  int canvas_width = std::max(1, int(std::ceil(target_size.w)));
-  int canvas_height = std::max(1, int(std::ceil(target_size.h)));
+  const BLSize target_size = ctx.target_size();
+  const int canvas_width = std::max(1, int(std::ceil(target_size.w)));
+  const int canvas_height = std::max(1, int(std::ceil(target_size.h)));
 
   std::vector<BLMatrix2D> matrix_cache(layers.size());
   std::vector<uint8_t> matrix_valid(layers.size(), 0);
@@ -1329,7 +1329,7 @@ void LottieComposition::render_layer_array(const std::vector<LottieLayer>& layer
       return matrix_cache[index];
 
     BLMatrix2D mat = layers[index].transform.matrix(frame);
-    int parent = layers[index].parent;
+    const int parent = layers[index].parent;
     if (parent >= 0)
       mat = lottie_matrix_multiply(resolve_matrix(size_t(parent)), mat);
 
@@ -1345,7 +1345,7 @@ void LottieComposition::render_layer_array(const std::vector<LottieLayer>& layer
       return opacity_cache[index];
 
     double value = layers[index].transform.opacity_at(frame);
-    int parent = layers[index].parent;
+    const int parent = layers[index].parent;
     if (parent >= 0)
       value *= resolve_opacity(size_t(parent));
 
@@ -1359,10 +1359,10 @@ void LottieComposition::render_layer_array(const std::vector<LottieLayer>& layer
 
   for (size_t i = layers.size(); i-- > 0;) {
     const LottieLayer& layer = layers[i];
-    bool has_vector = layer.root != nullptr;
-    bool has_image = layer.image_index >= 0 && size_t(layer.image_index) < _images.size();
-    bool has_precomp = layer.precomp_index >= 0 && size_t(layer.precomp_index) < _precomps.size();
-    bool has_matte_target = layer.matte_source >= 0 && layer.matte_mode > 0;
+    const bool has_vector = layer.root != nullptr;
+    const bool has_image = layer.image_index >= 0 && size_t(layer.image_index) < _images.size();
+    const bool has_precomp = layer.precomp_index >= 0 && size_t(layer.precomp_index) < _precomps.size();
+    const bool has_matte_target = layer.matte_source >= 0 && layer.matte_mode > 0;
     if (!has_vector && !has_image && !has_precomp && !has_matte_target)
       continue;
 
@@ -1372,23 +1372,23 @@ void LottieComposition::render_layer_array(const std::vector<LottieLayer>& layer
     if (frame < layer.in_point || frame >= layer.out_point)
       continue;
 
-    double layer_local_opacity = resolve_opacity(i);
-    double layer_opacity = opacity * layer_local_opacity;
+    const double layer_local_opacity = resolve_opacity(i);
+    const double layer_opacity = opacity * layer_local_opacity;
     if (layer_opacity <= 0.0 && !has_matte_target)
       continue;
 
-    BLMatrix2D layer_matrix_local = resolve_matrix(i);
-    BLMatrix2D layer_matrix = lottie_matrix_multiply(root_matrix, layer_matrix_local);
+    const BLMatrix2D layer_matrix_local = resolve_matrix(i);
+    const BLMatrix2D layer_matrix = lottie_matrix_multiply(root_matrix, layer_matrix_local);
 
     if (has_matte_target) {
-      int matte_index = layer.matte_source;
+      const int matte_index = layer.matte_source;
       if (matte_index < 0 || size_t(matte_index) >= layers.size())
         continue;
 
       const LottieLayer& matte_layer = layers[size_t(matte_index)];
-      BLMatrix2D matte_matrix_local = resolve_matrix(size_t(matte_index));
-      BLMatrix2D matte_matrix = lottie_matrix_multiply(root_matrix, matte_matrix_local);
-      double matte_opacity = opacity * resolve_opacity(size_t(matte_index));
+      const BLMatrix2D matte_matrix_local = resolve_matrix(size_t(matte_index));
+      const BLMatrix2D matte_matrix = lottie_matrix_multiply(root_matrix, matte_matrix_local);
+      const double matte_opacity = opacity * resolve_opacity(size_t(matte_index));
 
       auto render_to_image = [&](const LottieLayer& srcLayer,
                                  const BLMatrix2D& matrix,
@@ -1404,7 +1404,7 @@ void LottieComposition::render_layer_array(const std::vector<LottieLayer>& layer
         return img;
       };
 
-      BLImage matte_image = render_to_image(matte_layer, matte_matrix, matte_opacity);
+      const BLImage matte_image = render_to_image(matte_layer, matte_matrix, matte_opacity);
       BLImage content_image = render_to_image(layer, layer_matrix, layer_opacity);
 
       if (matte_image && content_image) {

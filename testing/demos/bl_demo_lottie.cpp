@@ -22,13 +22,8 @@ public:
   explicit MainWindow(const QStringList& animation_paths, QWidget* parent = nullptr)
     : QWidget(parent),
       _animation_paths(animation_paths) {
-    auto* layout = new QVBoxLayout();
-    auto* controls = new QHBoxLayout();
-
-    controls->addWidget(new QLabel(QStringLiteral("Renderer:")));
-    QBLCanvas::init_renderer_select_box(&_renderer_select, true);
-    controls->addWidget(&_renderer_select);
-    connect(&_renderer_select, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onRendererChanged);
+    auto* const layout = new QVBoxLayout();
+    auto* const controls = new QHBoxLayout();
 
     controls->addWidget(new QLabel(QStringLiteral("Animation:")));
     for (const QString& path : _animation_paths)
@@ -44,8 +39,15 @@ public:
     controls->addWidget(&_restart_button);
     connect(&_restart_button, &QPushButton::clicked, this, &MainWindow::onRestart);
 
+    controls->addWidget(new QLabel(QStringLiteral("Renderer:")));
+    QBLCanvas::init_renderer_select_box(&_renderer_select, true);
+    controls->addWidget(&_renderer_select);
+    connect(&_renderer_select, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onRendererChanged);
+
     controls->addStretch();
     layout->addLayout(controls);
+    // Disable canvas repain by Qt
+    _canvas.setAttribute(Qt::WA_OpaquePaintEvent, true);
     layout->addWidget(&_canvas, 1);
     setLayout(layout);
 
@@ -63,7 +65,7 @@ public:
     _last_time_ms = _elapsed.elapsed();
     _timer.start();
 
-    auto* toggleShortcut = new QShortcut(QKeySequence(Qt::Key_Space), this);
+    auto* const toggleShortcut = new QShortcut(QKeySequence(Qt::Key_Space), this);
     connect(toggleShortcut, &QShortcut::activated, this, &MainWindow::onTogglePlay);
   }
 
@@ -97,16 +99,16 @@ private Q_SLOTS:
     if (!_composition.is_valid())
       return;
 
-    qint64 now = _elapsed.elapsed();
+    const qint64 now = _elapsed.elapsed();
     double dt = (now - _last_time_ms) / 1000.0;
     _last_time_ms = now;
     if (dt < 0.0 || dt > 1.0)
       dt = 0.0;
 
     if (_playing) {
-      double rate = _composition.frame_rate();
-      double start = _composition.in_point();
-      double end = _composition.out_point();
+      const double rate = _composition.frame_rate();
+      const double start = _composition.in_point();
+      const double end = _composition.out_point();
       double span = end - start;
       if (span <= 0.0)
         span = rate > 0.0 ? rate : 1.0;
@@ -140,18 +142,18 @@ private:
 
   void onRenderBlend2D(BLContext& ctx) noexcept {
     ctx.clear_all();
-    ctx.fill_all(BLRgba32(0xFFFFFFFF));
+    ctx.fill_all(BLRgba32(0xFFDDDDDD));
 
     if (!_composition.is_valid())
       return;
 
-    double comp_w = _composition.width();
-    double comp_h = _composition.height();
+    const double comp_w = _composition.width();
+    const double comp_h = _composition.height();
     if (comp_w <= 0.0 || comp_h <= 0.0)
       return;
 
-    double canvas_w = double(_canvas.image_width());
-    double canvas_h = double(_canvas.image_height());
+    const double canvas_w = double(_canvas.image_width());
+    const double canvas_h = double(_canvas.image_height());
     if (canvas_w <= 0.0 || canvas_h <= 0.0)
       return;
 
@@ -159,19 +161,19 @@ private:
     if (scale <= 0.0)
       scale = 1.0;
 
-    double offset_x = (canvas_w - comp_w * scale) * 0.5;
-    double offset_y = (canvas_h - comp_h * scale) * 0.5;
+    const double offset_x = (canvas_w - comp_w * scale) * 0.5;
+    const double offset_y = (canvas_h - comp_h * scale) * 0.5;
 
-    BLMatrix2D translation = BLMatrix2D::make_translation(offset_x, offset_y);
-    BLMatrix2D scaling = BLMatrix2D::make_scaling(scale, scale);
-    BLMatrix2D root = lottie_matrix_multiply(translation, scaling);
+    const BLMatrix2D translation = BLMatrix2D::make_translation(offset_x, offset_y);
+    const BLMatrix2D scaling = BLMatrix2D::make_scaling(scale, scale);
+    const BLMatrix2D root = lottie_matrix_multiply(translation, scaling);
 
     _composition.render(ctx, _current_frame, root, 1.0);
   }
 
   void updateTitle() {
-    QString name = _current_path.isEmpty() ? QStringLiteral("None") : QFileInfo(_current_path).fileName();
-    QString title = QStringLiteral("Lottie Demo | %1 | Frame %2 | Render %3 ms | FPS %4")
+    const QString name = _current_path.isEmpty() ? QStringLiteral("None") : QFileInfo(_current_path).fileName();
+    const QString title = QStringLiteral("Lottie Demo | %1 | Frame %2 | Render %3 ms | FPS %4")
       .arg(name)
       .arg(_current_frame, 0, 'f', 1)
       .arg(_canvas.average_render_time(), 0, 'f', 2)
@@ -208,7 +210,7 @@ static QStringList gatherSearchRoots() {
 }
 
 static QString locateAnimation(const QString& input, const QStringList& roots) {
-  QFileInfo info(input);
+  const QFileInfo info(input);
   if (info.isAbsolute() && info.exists())
     return info.absoluteFilePath();
 
@@ -216,12 +218,12 @@ static QString locateAnimation(const QString& input, const QStringList& roots) {
     return info.absoluteFilePath();
 
   for (const QString& root : roots) {
-    QDir dir(root);
-    QString direct = dir.absoluteFilePath(input);
+    const QDir dir(root);
+    const QString direct = dir.absoluteFilePath(input);
     if (QFileInfo::exists(direct))
       return direct;
 
-    QString in_lottie = dir.absoluteFilePath(QStringLiteral("lottie/%1").arg(input));
+    const QString in_lottie = dir.absoluteFilePath(QStringLiteral("lottie/%1").arg(input));
     if (QFileInfo::exists(in_lottie))
       return in_lottie;
   }
@@ -232,20 +234,20 @@ int main(int argc, char* argv[]) {
   QApplication app(argc, argv);
   QApplication::setApplicationDisplayName(QStringLiteral("Blend2D Lottie Demo"));
 
-  QStringList roots = gatherSearchRoots();
-  QStringList args = app.arguments();
+  const QStringList roots = gatherSearchRoots();
+  const QStringList args = app.arguments();
   QStringList animations;
 
   for (int i = 1; i < args.size(); i++) {
-    QString located = locateAnimation(args.at(i), roots);
+    const QString located = locateAnimation(args.at(i), roots);
     if (!located.isEmpty())
       animations << located;
   }
 
   if (animations.isEmpty()) {
-    QStringList defaults {QStringLiteral("testTiger.json"), QStringLiteral("Shopping Bag.json")};
+    const QStringList defaults {QStringLiteral("testTiger.json"), QStringLiteral("StatChart.json")};
     for (const QString& name : defaults) {
-      QString located = locateAnimation(name, roots);
+      const QString located = locateAnimation(name, roots);
       if (!located.isEmpty())
         animations << located;
     }
