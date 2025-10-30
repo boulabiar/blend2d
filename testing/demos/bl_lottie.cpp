@@ -1534,50 +1534,173 @@ const BLPath& LottiePolystar::path_at(double frame) const {
 
   cached_path.clear();
 
+  constexpr double kDegToRad = kPi / 180.0;
+  constexpr double kPolystarMagic = 0.47829 / 0.28;
+  constexpr double kPolygonMagic = 0.25;
+
   const double evaluated_points = std::max(points.evaluate(frame), 0.0);
   const double evaluated_outer = std::abs(outer_radius.evaluate(frame));
-  double evaluated_inner = std::abs(inner_radius.evaluate(frame));
+  const double evaluated_inner = std::abs(inner_radius.evaluate(frame));
   const double evaluated_rotation = rotation.evaluate(frame);
   const LottieVec2 center = position.evaluate(frame);
   const int direction_sign = direction >= 0 ? 1 : -1;
 
-  if (evaluated_outer <= 0.0 || evaluated_points < 2.0) {
+  if (evaluated_outer <= 0.0 || evaluated_points < 1.0) {
     cached_frame = frame;
     cache_valid = true;
     return cached_path;
   }
 
-  int point_count = std::max(2, int(std::round(evaluated_points)));
-  const double angle_step = (2.0 * kPi / double(point_count)) * double(direction_sign);
-  const double start_angle = (evaluated_rotation - 90.0) * (kPi / 180.0);
+  if (star_type == 1) {
+    const double pts_count = std::max(evaluated_points, 1.0);
+    const double outer_round = std::clamp(outer_roundness.evaluate(frame) * 0.01, 0.0, 1.0);
+    const double inner_round = std::clamp(inner_roundness.evaluate(frame) * 0.01, 0.0, 1.0);
+    const double direction_value = double(direction_sign);
 
-  if (star_type == 1 && evaluated_inner > 0.0) {
-    const double half_step = angle_step * 0.5;
-    for (int i = 0; i < point_count; ++i) {
-      const double outer_angle = start_angle + angle_step * i;
-      const double ox = center.x + std::cos(outer_angle) * evaluated_outer;
-      const double oy = center.y + std::sin(outer_angle) * evaluated_outer;
-      if (i == 0)
-        cached_path.move_to(ox, oy);
-      else
-        cached_path.line_to(ox, oy);
+    const double angle_per_point = (2.0 * kPi) / pts_count;
+    const double half_angle_per_point = angle_per_point * 0.5;
+    const double partial_amount = pts_count - std::floor(pts_count);
 
-      const double inner_angle = outer_angle + half_step;
-      const double ix = center.x + std::cos(inner_angle) * evaluated_inner;
-      const double iy = center.y + std::sin(inner_angle) * evaluated_inner;
-      cached_path.line_to(ix, iy);
+    double angle = (evaluated_rotation - 90.0) * kDegToRad;
+    double partial_radius = 0.0;
+    bool has_roundness = (outer_round > 0.0 || inner_round > 0.0);
+
+    if (partial_amount != 0.0)
+      angle += half_angle_per_point * (1.0 - partial_amount) * direction_value;
+
+    double x = 0.0;
+    double y = 0.0;
+    if (partial_amount != 0.0) {
+      partial_radius = evaluated_inner + partial_amount * (evaluated_outer - evaluated_inner);
+      x = partial_radius * std::cos(angle);
+      y = partial_radius * std::sin(angle);
+      angle += angle_per_point * partial_amount * 0.5 * direction_value;
     }
+    else {
+      x = evaluated_outer * std::cos(angle);
+      y = evaluated_outer * std::sin(angle);
+      angle += half_angle_per_point * direction_value;
+    }
+
+    cached_path.move_to(center.x + x, center.y + y);
+
+    const size_t num_points = size_t(std::ceil(pts_count) * 2.0);
+    if (num_points == 0) {
+      cached_path.close();
+      cached_frame = frame;
+      cache_valid = true;
+      return cached_path;
+    }
+
+    bool long_segment = false;
+    for (size_t i = 0; i < num_points; ++i) {
+      double radius = long_segment ? evaluated_outer : evaluated_inner;
+      double delta_theta = half_angle_per_point;
+
+      if (partial_radius != 0.0 && i == num_points - 2)
+        delta_theta = angle_per_point * partial_amount * 0.5;
+      if (partial_radius != 0.0 && i == num_points - 1)
+        radius = partial_radius;
+
+      const double previous_x = x;
+      const double previous_y = y;
+      x = radius * std::cos(angle);
+      y = radius * std::sin(angle);
+
+      if (has_roundness) {
+        const double cp1_theta = std::atan2(previous_y, previous_x) - (kPi * 0.5) * direction_value;
+        const double cp2_theta = std::atan2(y, x) - (kPi * 0.5) * direction_value;
+
+        const double cp1_dir_x = std::cos(cp1_theta);
+        const double cp1_dir_y = std::sin(cp1_theta);
+        const double cp2_dir_x = std::cos(cp2_theta);
+        const double cp2_dir_y = std::sin(cp2_theta);
+
+        const double cp1_round = long_segment ? inner_round : outer_round;
+        const double cp2_round = long_segment ? outer_round : inner_round;
+        const double cp1_radius = long_segment ? evaluated_inner : evaluated_outer;
+        const double cp2_radius = long_segment ? evaluated_outer : evaluated_inner;
+
+        double cp1x = cp1_radius * cp1_round * kPolystarMagic * cp1_dir_x / pts_count;
+        double cp1y = cp1_radius * cp1_round * kPolystarMagic * cp1_dir_y / pts_count;
+        double cp2x = cp2_radius * cp2_round * kPolystarMagic * cp2_dir_x / pts_count;
+        double cp2y = cp2_radius * cp2_round * kPolystarMagic * cp2_dir_y / pts_count;
+
+        if (partial_amount != 0.0 && (i == 0 || i == num_points - 1)) {
+          cp1x *= partial_amount;
+          cp1y *= partial_amount;
+          cp2x *= partial_amount;
+          cp2y *= partial_amount;
+        }
+
+        cached_path.cubic_to(center.x + previous_x - cp1x,
+                             center.y + previous_y - cp1y,
+                             center.x + x + cp2x,
+                             center.y + y + cp2y,
+                             center.x + x,
+                             center.y + y);
+      }
+      else {
+        cached_path.line_to(center.x + x, center.y + y);
+      }
+
+      angle += delta_theta * direction_value;
+      long_segment = !long_segment;
+    }
+
+    cached_path.close();
+    cached_frame = frame;
+    cache_valid = true;
+    return cached_path;
   }
-  else {
-    for (int i = 0; i < point_count; ++i) {
-      const double angle = start_angle + angle_step * i;
-      const double x = center.x + std::cos(angle) * evaluated_outer;
-      const double y = center.y + std::sin(angle) * evaluated_outer;
-      if (i == 0)
-        cached_path.move_to(x, y);
-      else
-        cached_path.line_to(x, y);
+
+  const size_t polygon_count = size_t(std::max(2.0, std::floor(evaluated_points)));
+  if (polygon_count < 2) {
+    cached_frame = frame;
+    cache_valid = true;
+    return cached_path;
+  }
+
+  const double outer_round = std::clamp(outer_roundness.evaluate(frame) * 0.01, 0.0, 1.0);
+  const bool has_roundness = outer_round > 0.0;
+  const double direction_value = double(direction_sign);
+  const double angle_per_point = (2.0 * kPi) / double(polygon_count);
+
+  double angle = (evaluated_rotation - 90.0) * kDegToRad;
+  double x = evaluated_outer * std::cos(angle);
+  double y = evaluated_outer * std::sin(angle);
+  cached_path.move_to(center.x + x, center.y + y);
+
+  angle += angle_per_point * direction_value;
+  const double coeff = angle_per_point * evaluated_outer * outer_round * kPolygonMagic;
+
+  for (size_t i = 0; i < polygon_count; ++i) {
+    const double previous_x = x;
+    const double previous_y = y;
+    x = evaluated_outer * std::cos(angle);
+    y = evaluated_outer * std::sin(angle);
+
+    if (has_roundness) {
+      const double cp1_theta = std::atan2(previous_y, previous_x) - (kPi * 0.5) * direction_value;
+      const double cp2_theta = std::atan2(y, x) - (kPi * 0.5) * direction_value;
+
+      const double cp1x = coeff * std::cos(cp1_theta);
+      const double cp1y = coeff * std::sin(cp1_theta);
+      const double cp2x = coeff * std::cos(cp2_theta);
+      const double cp2y = coeff * std::sin(cp2_theta);
+
+      cached_path.cubic_to(center.x + previous_x - cp1x,
+                           center.y + previous_y - cp1y,
+                           center.x + x + cp2x,
+                           center.y + y + cp2y,
+                           center.x + x,
+                           center.y + y);
     }
+    else {
+      cached_path.line_to(center.x + x, center.y + y);
+    }
+
+    angle += angle_per_point * direction_value;
   }
 
   cached_path.close();
