@@ -885,6 +885,40 @@ void render_group(const LottieGroup& group, BLContext& ctx, double frame, const 
 
 } // namespace
 
+void LottieComposition::render_layer_content(const LottieLayer& layer,
+                                             BLContext& ctx,
+                                             double frame,
+                                             const BLMatrix2D& layer_matrix,
+                                             double opacity) const {
+  if (opacity <= 0.0)
+    return;
+
+  if (layer.root) {
+    render_group(*layer.root, ctx, frame, layer_matrix, opacity);
+    return;
+  }
+
+  if (layer.image_index >= 0 && size_t(layer.image_index) < _images.size()) {
+    const LottieImageAsset& image = _images[layer.image_index];
+    if (!image.image || image.width <= 0.0 || image.height <= 0.0)
+      return;
+
+    ctx.save();
+    ctx.apply_transform(layer_matrix);
+    double previous_alpha = ctx.global_alpha();
+    ctx.set_global_alpha(previous_alpha * opacity);
+    ctx.blit_image(BLRect(0.0, 0.0, image.width, image.height), image.image);
+    ctx.set_global_alpha(previous_alpha);
+    ctx.restore();
+    return;
+  }
+
+  if (layer.precomp_index >= 0 && size_t(layer.precomp_index) < _precomps.size()) {
+    const LottiePrecomposition& precomp = _precomps[layer.precomp_index];
+    render_layer_array(precomp.layers, ctx, frame, layer_matrix, opacity);
+  }
+}
+
 double lottie_lerp(double a, double b, double t) noexcept {
   return a + (b - a) * t;
 }
@@ -1127,7 +1161,35 @@ bool LottieComposition::load_from_file(const QString& path, QString* error_messa
     }
   };
 
-  auto parse_layer_array = [&](const QJsonArray& layer_array, std::vector<LottieLayer>& target) {
+    auto assign_track_mattes = [](std::vector<LottieLayer>& layers) {
+    int pending = -1;
+    int pending_mode = 0;
+    for (size_t i = 0; i < layers.size(); ++i) {
+      LottieLayer& layer = layers[i];
+      if (layer.is_matte_source) {
+        pending = int(i);
+        pending_mode = layer.matte_source_mode;
+        layer.hidden = true;
+        continue;
+      }
+      if (layer.track_matte_mode > 0) {
+        if (pending >= 0) {
+          layer.matte_source = pending;
+          layer.matte_mode = layer.track_matte_mode > 0 ? layer.track_matte_mode : pending_mode;
+          layers[size_t(pending)].hidden = true;
+          pending = -1;
+          pending_mode = 0;
+        }
+        else {
+          layer.matte_source = -1;
+          layer.matte_mode = 0;
+          layer.track_matte_mode = 0;
+        }
+      }
+    }
+  };
+
+auto parse_layer_array = [&](const QJsonArray& layer_array, std::vector<LottieLayer>& target) {
     target.clear();
     target.reserve(layer_array.size());
 
@@ -1144,6 +1206,12 @@ bool LottieComposition::load_from_file(const QString& path, QString* error_messa
         : -1;
       layer.name = layerObj.value(QLatin1String("nm")).toString();
       layer.ref_id = layerObj.value(QLatin1String("refId")).toString();
+      layer.track_matte_mode = layerObj.value(QLatin1String("tt")).toInt();
+      layer.matte_source_mode = layerObj.value(QLatin1String("td")).toInt();
+      layer.is_matte_source = layer.matte_source_mode != 0;
+      layer.hidden = false;
+      layer.matte_source = -1;
+      layer.matte_mode = 0;
       layer.in_point = layerObj.value(QLatin1String("ip")).toDouble(_in_point);
       layer.out_point = layerObj.value(QLatin1String("op")).toDouble(_out_point);
       parse_transform_object(layerObj.value(QLatin1String("ks")).toObject(), layer.transform);
@@ -1168,6 +1236,7 @@ bool LottieComposition::load_from_file(const QString& path, QString* error_messa
     }
 
     finalize_parent_relationships(target);
+    assign_track_mattes(target);
   };
 
   auto resolve_layer_resources = [&](std::vector<LottieLayer>& layers, const QHash<QString, int>& local_image_map, const QHash<QString, int>& local_precomp_map) {
@@ -1208,12 +1277,15 @@ bool LottieComposition::load_from_file(const QString& path, QString* error_messa
   for (int i = 0; i < int(_precomps.size()); i++)
     precomp_index_map.insert(_precomps[size_t(i)].id, i);
 
-  for (LottiePrecomposition& precomp : _precomps)
+  for (LottiePrecomposition& precomp : _precomps) {
     resolve_layer_resources(precomp.layers, image_index_map, precomp_index_map);
+    assign_track_mattes(precomp.layers);
+  }
 
   QJsonArray layers = root.value(QLatin1String("layers")).toArray();
   parse_layer_array(layers, _layers);
   resolve_layer_resources(_layers, image_index_map, precomp_index_map);
+  assign_track_mattes(_layers);
 
   bool has_renderable_layer = false;
   for (const LottieLayer& layer : _layers) {
@@ -1245,6 +1317,10 @@ void LottieComposition::render_layer_array(const std::vector<LottieLayer>& layer
                                            double opacity) const {
   if (layers.empty())
     return;
+
+  BLSize target_size = ctx.target_size();
+  int canvas_width = std::max(1, int(std::ceil(target_size.w)));
+  int canvas_height = std::max(1, int(std::ceil(target_size.h)));
 
   std::vector<BLMatrix2D> matrix_cache(layers.size());
   std::vector<uint8_t> matrix_valid(layers.size(), 0);
@@ -1286,36 +1362,62 @@ void LottieComposition::render_layer_array(const std::vector<LottieLayer>& layer
     bool has_vector = layer.root != nullptr;
     bool has_image = layer.image_index >= 0 && size_t(layer.image_index) < _images.size();
     bool has_precomp = layer.precomp_index >= 0 && size_t(layer.precomp_index) < _precomps.size();
-    if (!has_vector && !has_image && !has_precomp)
+    bool has_matte_target = layer.matte_source >= 0 && layer.matte_mode > 0;
+    if (!has_vector && !has_image && !has_precomp && !has_matte_target)
+      continue;
+
+    if (layer.hidden && !has_matte_target)
       continue;
 
     if (frame < layer.in_point || frame >= layer.out_point)
       continue;
 
-    double layer_opacity = opacity * resolve_opacity(i);
-    if (layer_opacity <= 0.0)
+    double layer_local_opacity = resolve_opacity(i);
+    double layer_opacity = opacity * layer_local_opacity;
+    if (layer_opacity <= 0.0 && !has_matte_target)
       continue;
 
-    BLMatrix2D layer_matrix = lottie_matrix_multiply(root_matrix, resolve_matrix(i));
-    if (has_vector)
-      render_group(*layer.root, ctx, frame, layer_matrix, layer_opacity);
+    BLMatrix2D layer_matrix_local = resolve_matrix(i);
+    BLMatrix2D layer_matrix = lottie_matrix_multiply(root_matrix, layer_matrix_local);
 
-    if (has_image) {
-      const LottieImageAsset& image = _images[layer.image_index];
-      if (image.image && image.width > 0.0 && image.height > 0.0) {
-        ctx.save();
-        ctx.apply_transform(layer_matrix);
-        double previous_alpha = ctx.global_alpha();
-        ctx.set_global_alpha(previous_alpha * layer_opacity);
-        ctx.blit_image(BLRect(0.0, 0.0, image.width, image.height), image.image);
-        ctx.set_global_alpha(previous_alpha);
-        ctx.restore();
+    if (has_matte_target) {
+      int matte_index = layer.matte_source;
+      if (matte_index < 0 || size_t(matte_index) >= layers.size())
+        continue;
+
+      const LottieLayer& matte_layer = layers[size_t(matte_index)];
+      BLMatrix2D matte_matrix_local = resolve_matrix(size_t(matte_index));
+      BLMatrix2D matte_matrix = lottie_matrix_multiply(root_matrix, matte_matrix_local);
+      double matte_opacity = opacity * resolve_opacity(size_t(matte_index));
+
+      auto render_to_image = [&](const LottieLayer& srcLayer,
+                                 const BLMatrix2D& matrix,
+                                 double op) -> BLImage {
+        BLImage img;
+        if (img.create(canvas_width, canvas_height, BL_FORMAT_PRGB32) != BL_SUCCESS)
+          return img;
+        {
+          BLContext imgCtx(img);
+          imgCtx.clear_all();
+          render_layer_content(srcLayer, imgCtx, frame, matrix, op);
+        }
+        return img;
+      };
+
+      BLImage matte_image = render_to_image(matte_layer, matte_matrix, matte_opacity);
+      BLImage content_image = render_to_image(layer, layer_matrix, layer_opacity);
+
+      if (matte_image && content_image) {
+        if (layer.matte_mode == 1 || layer.matte_mode == 2) {
+          BLContext blendCtx(content_image);
+          blendCtx.set_comp_op(layer.matte_mode == 1 ? BL_COMP_OP_DST_IN : BL_COMP_OP_DST_OUT);
+          blendCtx.blit_image(BLPoint(0, 0), matte_image);
+        }
+        ctx.blit_image(BLPoint(0, 0), content_image);
       }
+      continue;
     }
 
-    if (has_precomp) {
-      const LottiePrecomposition& precomp = _precomps[layer.precomp_index];
-      render_layer_array(precomp.layers, ctx, frame, layer_matrix, layer_opacity);
-    }
+    render_layer_content(layer, ctx, frame, layer_matrix, layer_opacity);
   }
 }

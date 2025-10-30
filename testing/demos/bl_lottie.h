@@ -177,6 +177,12 @@ struct LottieLayer {
   QString ref_id;
   int image_index {-1};
   int precomp_index {-1};
+  int matte_source {-1};
+  int matte_mode {};
+  int track_matte_mode {};
+  int matte_source_mode {};
+  bool is_matte_source {};
+  bool hidden {};
   double in_point {};
   double out_point {};
   LottieTransform transform;
@@ -220,6 +226,11 @@ private:
                           double frame,
                           const BLMatrix2D& root_matrix,
                           double opacity) const;
+  void render_layer_content(const LottieLayer& layer,
+                            BLContext& ctx,
+                            double frame,
+                            const BLMatrix2D& layer_matrix,
+                            double opacity) const;
 };
 
 #endif // BL_DEMO_LOTTIE_H_INCLUDED
