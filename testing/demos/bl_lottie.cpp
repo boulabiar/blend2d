@@ -91,6 +91,8 @@ void parse_animated_double(const QJsonValue& value, LottieAnimatedValue<double>&
   const QJsonArray frames = obj.value(QLatin1String("k")).toArray();
   dst.animated = true;
   dst.keyframes.reserve(frames.size());
+  double prev_end = fallback;
+  bool prev_end_valid = false;
   for (const QJsonValue& entry : frames) {
     if (!entry.isObject())
       continue;
@@ -103,10 +105,31 @@ void parse_animated_double(const QJsonValue& value, LottieAnimatedValue<double>&
       if (!arr.isEmpty())
         number = arr.first().toDouble(fallback);
     }
-    else {
+    else if (!sValue.isUndefined() && !sValue.isNull() && sValue.isDouble()) {
       number = sValue.toDouble(fallback);
     }
+    else if (prev_end_valid) {
+      number = prev_end;
+    }
+
     dst.keyframes.push_back({time, number});
+
+    const QJsonValue eValue = key.value(QLatin1String("e"));
+    if (eValue.isArray()) {
+      const QJsonArray arr = eValue.toArray();
+      if (!arr.isEmpty()) {
+        prev_end = arr.first().toDouble(number);
+        prev_end_valid = true;
+      }
+    }
+    else if (eValue.isDouble()) {
+      prev_end = eValue.toDouble(number);
+      prev_end_valid = true;
+    }
+    else {
+      prev_end = number;
+      prev_end_valid = true;
+    }
   }
 
   if (dst.keyframes.empty()) {
@@ -138,6 +161,8 @@ void parse_animated_vec2(const QJsonValue& value, LottieAnimatedValue<LottieVec2
   const QJsonArray frames = obj.value(QLatin1String("k")).toArray();
   dst.animated = true;
   dst.keyframes.reserve(frames.size());
+  LottieVec2 prev_end = fallback;
+  bool prev_end_valid = false;
   for (const QJsonValue& entry : frames) {
     if (!entry.isObject())
       continue;
@@ -145,8 +170,21 @@ void parse_animated_vec2(const QJsonValue& value, LottieAnimatedValue<LottieVec2
     const double time = key.value(QLatin1String("t")).toDouble();
     LottieVec2 vec = fallback;
     const QJsonValue sval = key.value(QLatin1String("s"));
-    vec = to_vec2(sval, fallback);
+    if ((sval.isUndefined() || sval.isNull()) && prev_end_valid)
+      vec = prev_end;
+    else
+      vec = to_vec2(sval, fallback);
     dst.keyframes.push_back({time, vec});
+
+    const QJsonValue eval = key.value(QLatin1String("e"));
+    if (!eval.isUndefined() && !eval.isNull()) {
+      prev_end = to_vec2(eval, vec);
+      prev_end_valid = true;
+    }
+    else {
+      prev_end = vec;
+      prev_end_valid = true;
+    }
   }
 
   if (dst.keyframes.empty()) {
@@ -178,13 +216,30 @@ void parse_animated_color(const QJsonValue& value, LottieAnimatedValue<LottieCol
   const QJsonArray frames = obj.value(QLatin1String("k")).toArray();
   dst.animated = true;
   dst.keyframes.reserve(frames.size());
+  LottieColor prev_end = fallback;
+  bool prev_end_valid = false;
   for (const QJsonValue& entry : frames) {
     if (!entry.isObject())
       continue;
     const QJsonObject key = entry.toObject();
     const double time = key.value(QLatin1String("t")).toDouble();
-    const LottieColor color = to_color(key.value(QLatin1String("s")), fallback);
+    LottieColor color = fallback;
+    const QJsonValue sValue = key.value(QLatin1String("s"));
+    if ((sValue.isUndefined() || sValue.isNull()) && prev_end_valid)
+      color = prev_end;
+    else
+      color = to_color(sValue, fallback);
     dst.keyframes.push_back({time, color});
+
+    const QJsonValue eValue = key.value(QLatin1String("e"));
+    if (!eValue.isUndefined() && !eValue.isNull()) {
+      prev_end = to_color(eValue, color);
+      prev_end_valid = true;
+    }
+    else {
+      prev_end = color;
+      prev_end_valid = true;
+    }
   }
 
   if (dst.keyframes.empty()) {
@@ -281,6 +336,366 @@ BLPath build_path_from_shape(const LottieShapePath::ShapeData& shape) {
 
   return path;
 }
+
+namespace {
+
+struct TrimSegment {
+  BLPoint p0 {};
+  BLPoint p1 {};
+  double length {};
+};
+
+struct TrimSubpath {
+  BLPoint start {};
+  bool closed {};
+  double length {};
+  std::vector<TrimSegment> segments;
+};
+
+struct FlattenedPath {
+  std::vector<TrimSubpath> subpaths;
+  double total_length {};
+};
+
+constexpr double kTrimEpsilon = 1e-9;
+
+static double segment_distance(const BLPoint& a, const BLPoint& b) noexcept {
+  return std::hypot(a.x - b.x, a.y - b.y);
+}
+
+static BLPoint lerp_point(const BLPoint& a, const BLPoint& b, double t) noexcept {
+  return BLPoint(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
+}
+
+static int curve_subdivisions(double length_estimate) noexcept {
+  int steps = int(std::ceil(length_estimate / 5.0));
+  if (steps < 1) steps = 1;
+  if (steps > 64) steps = 64;
+  return steps;
+}
+
+static double append_segment(std::vector<TrimSegment>& segments, const BLPoint& p0, const BLPoint& p1) {
+  const double len = segment_distance(p0, p1);
+  if (len <= kTrimEpsilon)
+    return 0.0;
+  segments.push_back(TrimSegment{p0, p1, len});
+  return len;
+}
+
+static void flatten_quadratic(const BLPoint& p0, const BLPoint& c0, const BLPoint& p1, TrimSubpath& subpath) {
+  const double estimate = segment_distance(p0, c0) + segment_distance(c0, p1);
+  const int steps = curve_subdivisions(estimate);
+  BLPoint prev = p0;
+  for (int i = 1; i <= steps; i++) {
+    const double t = double(i) / double(steps);
+    const double it = 1.0 - t;
+    const BLPoint point{
+      it * it * p0.x + 2.0 * it * t * c0.x + t * t * p1.x,
+      it * it * p0.y + 2.0 * it * t * c0.y + t * t * p1.y
+    };
+    subpath.length += append_segment(subpath.segments, prev, point);
+    prev = point;
+  }
+}
+
+static void flatten_cubic(const BLPoint& p0, const BLPoint& c0, const BLPoint& c1, const BLPoint& p1, TrimSubpath& subpath) {
+  const double estimate = segment_distance(p0, c0) + segment_distance(c0, c1) + segment_distance(c1, p1);
+  const int steps = curve_subdivisions(estimate);
+  BLPoint prev = p0;
+  for (int i = 1; i <= steps; i++) {
+    const double t = double(i) / double(steps);
+    const double it = 1.0 - t;
+    const BLPoint point{
+      it * it * it * p0.x +
+      3.0 * it * it * t * c0.x +
+      3.0 * it * t * t * c1.x +
+      t * t * t * p1.x,
+      it * it * it * p0.y +
+      3.0 * it * it * t * c0.y +
+      3.0 * it * t * t * c1.y +
+      t * t * t * p1.y
+    };
+    subpath.length += append_segment(subpath.segments, prev, point);
+    prev = point;
+  }
+}
+
+static FlattenedPath flatten_path(const BLPath& path) {
+  FlattenedPath result;
+  BLPathView view = path.view();
+  const uint8_t* cmds = view.command_data;
+  const BLPoint* vtx = view.vertex_data;
+  const size_t size = view.size;
+
+  TrimSubpath current;
+  bool have_current = false;
+  BLPoint current_point {};
+  BLPoint start_point {};
+  size_t i = 0;
+
+  auto flush_current = [&]() {
+    if (!have_current)
+      return;
+    if (!current.segments.empty()) {
+      result.total_length += current.length;
+      result.subpaths.push_back(std::move(current));
+      current = TrimSubpath{};
+    }
+    have_current = false;
+  };
+
+  while (i < size) {
+    const uint8_t cmd = cmds[i];
+    switch (cmd) {
+      case BL_PATH_CMD_MOVE: {
+        flush_current();
+        start_point = vtx[i];
+        current_point = start_point;
+        current.start = start_point;
+        current.closed = false;
+        current.length = 0.0;
+        have_current = true;
+        i += 1;
+        break;
+      }
+
+      case BL_PATH_CMD_ON: {
+        if (!have_current) {
+          start_point = vtx[i];
+          current_point = start_point;
+          current.start = start_point;
+          current.closed = false;
+          current.length = 0.0;
+          have_current = true;
+        }
+        const BLPoint end = vtx[i];
+        current.length += append_segment(current.segments, current_point, end);
+        current_point = end;
+        i += 1;
+        break;
+      }
+
+      case BL_PATH_CMD_QUAD: {
+        if (!have_current) {
+          start_point = current_point = BLPoint(0, 0);
+          current.closed = false;
+          current.length = 0.0;
+          have_current = true;
+        }
+        const BLPoint c0 = vtx[i];
+        const BLPoint end = vtx[i + 1];
+        flatten_quadratic(current_point, c0, end, current);
+        current_point = end;
+        i += 2;
+        break;
+      }
+
+      case BL_PATH_CMD_CUBIC: {
+        if (!have_current) {
+          start_point = current_point = BLPoint(0, 0);
+          current.closed = false;
+          current.length = 0.0;
+          have_current = true;
+        }
+        const BLPoint c0 = vtx[i];
+        const BLPoint c1 = vtx[i + 1];
+        const BLPoint end = vtx[i + 2];
+        flatten_cubic(current_point, c0, c1, end, current);
+        current_point = end;
+        i += 3;
+        break;
+      }
+
+      case BL_PATH_CMD_CLOSE: {
+        if (have_current) {
+          current.length += append_segment(current.segments, current_point, start_point);
+          current_point = start_point;
+          current.closed = true;
+        }
+        i += 1;
+        break;
+      }
+
+      default:
+        // Unsupported commands (conic/weight) are ignored.
+        i += 1;
+        break;
+    }
+  }
+
+  flush_current();
+  return result;
+}
+
+static bool points_close(const BLPoint& a, const BLPoint& b) noexcept {
+  return segment_distance(a, b) <= 1e-6;
+}
+
+static void append_trimmed_range(const std::vector<TrimSegment>& segments,
+                                 double start_distance,
+                                 double end_distance,
+                                 BLPath& out) {
+  if (end_distance - start_distance <= kTrimEpsilon)
+    return;
+
+  double cursor = 0.0;
+  bool has_point = false;
+  BLPoint last {};
+
+  for (const TrimSegment& seg : segments) {
+    const double seg_start = cursor;
+    const double seg_end = cursor + seg.length;
+    const double range_start = std::max(start_distance, seg_start);
+    const double range_end = std::min(end_distance, seg_end);
+    cursor = seg_end;
+
+    if (range_end - range_start <= kTrimEpsilon)
+      continue;
+
+    const double local_start = (range_start - seg_start) / seg.length;
+    const double local_end = (range_end - seg_start) / seg.length;
+    const BLPoint p_start = lerp_point(seg.p0, seg.p1, local_start);
+    const BLPoint p_end = lerp_point(seg.p0, seg.p1, local_end);
+
+    if (!has_point) {
+      out.move_to(p_start.x, p_start.y);
+      has_point = true;
+    }
+    else if (!points_close(last, p_start)) {
+      out.line_to(p_start.x, p_start.y);
+    }
+
+    out.line_to(p_end.x, p_end.y);
+    last = p_end;
+  }
+}
+
+static void append_trimmed_subpath(const TrimSubpath& subpath,
+                                   double start_frac,
+                                   double end_frac,
+                                   double length,
+                                   BLPath& out) {
+  if (length <= kTrimEpsilon)
+    return;
+
+  const double start_distance = start_frac * length;
+  const double end_distance = end_frac * length;
+
+  if (end_distance - start_distance <= kTrimEpsilon)
+    return;
+
+  append_trimmed_range(subpath.segments, start_distance, end_distance, out);
+}
+
+static void append_trimmed_with_wrap(const TrimSubpath& subpath,
+                                     double start_frac,
+                                     double end_frac,
+                                     double length,
+                                     BLPath& out) {
+  if (end_frac <= 1.0) {
+    append_trimmed_subpath(subpath, start_frac, end_frac, length, out);
+    return;
+  }
+
+  append_trimmed_subpath(subpath, start_frac, 1.0, length, out);
+  append_trimmed_subpath(subpath, 0.0, end_frac - 1.0, length, out);
+}
+
+static void append_trimmed_with_wrap(const std::vector<TrimSegment>& segments,
+                                     double start_frac,
+                                     double end_frac,
+                                     double length,
+                                     BLPath& out) {
+  if (length <= kTrimEpsilon)
+    return;
+
+  const double start_distance = start_frac * length;
+  const double end_distance = end_frac * length;
+
+  if (end_distance - start_distance <= kTrimEpsilon)
+    return;
+
+  if (end_distance <= length) {
+    append_trimmed_range(segments, start_distance, end_distance, out);
+    return;
+  }
+
+  append_trimmed_range(segments, start_distance, length, out);
+  append_trimmed_range(segments, 0.0, end_distance - length, out);
+}
+
+static double normalize_fraction(double value) noexcept {
+  double result = std::fmod(value, 1.0);
+  if (result < 0.0)
+    result += 1.0;
+  return result;
+}
+
+static double normalize_degrees(double value) noexcept {
+  double result = std::fmod(value, 360.0);
+  if (result < 0.0)
+    result += 360.0;
+  return result;
+}
+
+static bool apply_trim_to_path(const BLPath& source,
+                               const LottieTrimPath& trim,
+                               double frame,
+                               BLPath& out) {
+  const double start_value = trim.start.evaluate(frame);
+  const double end_value = trim.end.evaluate(frame);
+  const double offset_value = trim.offset.evaluate(frame);
+
+  const double clamped_start = std::clamp(start_value, 0.0, 100.0);
+  const double clamped_end = std::clamp(end_value, 0.0, 100.0);
+  double range = clamped_end - clamped_start;
+  if (range < 0.0)
+    range += 100.0;
+
+  if (range >= 99.999)
+    return false;
+
+  const double offset_fraction = normalize_fraction(normalize_degrees(offset_value) / 360.0);
+  const double start_fraction = normalize_fraction(clamped_start / 100.0 + offset_fraction);
+  const double end_fraction = start_fraction + range / 100.0;
+
+  const FlattenedPath flattened = flatten_path(source);
+  if (flattened.total_length <= kTrimEpsilon || flattened.subpaths.empty()) {
+    out.clear();
+    return true;
+  }
+
+  out.clear();
+  out.reserve(source.size());
+
+  if (trim.mode == 2) {
+    for (const TrimSubpath& subpath : flattened.subpaths) {
+      const double sub_length = subpath.length;
+      if (sub_length <= kTrimEpsilon)
+        continue;
+      append_trimmed_with_wrap(subpath, start_fraction, end_fraction, sub_length, out);
+    }
+    return true;
+  }
+
+  std::vector<TrimSegment> aggregate;
+  aggregate.reserve(source.size());
+  for (const TrimSubpath& subpath : flattened.subpaths) {
+    for (const TrimSegment& seg : subpath.segments)
+      aggregate.push_back(seg);
+  }
+
+  if (aggregate.empty()) {
+    out.clear();
+    return true;
+  }
+
+  const double total_length = flattened.total_length;
+  append_trimmed_with_wrap(aggregate, start_fraction, end_fraction, total_length, out);
+  return true;
+}
+
+} // namespace
 
 std::unique_ptr<LottieShapePath> parse_shape_path(const QJsonObject& obj) {
   const QJsonObject ks = obj.value(QLatin1String("ks")).toObject();
@@ -548,6 +963,19 @@ std::unique_ptr<LottieGradientFill> parse_gradient_fill(const QJsonObject& obj) 
   return fill;
 }
 
+std::unique_ptr<LottieTrimPath> parse_trim_path(const QJsonObject& obj) {
+  auto trim = std::make_unique<LottieTrimPath>();
+  parse_animated_double(obj.value(QLatin1String("s")), trim->start, 0.0);
+  parse_animated_double(obj.value(QLatin1String("e")), trim->end, 100.0);
+  parse_animated_double(obj.value(QLatin1String("o")), trim->offset, 0.0);
+  int mode = obj.value(QLatin1String("m")).toInt(1);
+  if (mode != 1 && mode != 2)
+    mode = 1;
+  trim->mode = mode;
+  trim->enabled = !obj.value(QLatin1String("hd")).toBool(false);
+  return trim;
+}
+
 std::unique_ptr<LottieFill> parse_fill(const QJsonObject& obj) {
   auto fill = std::make_unique<LottieFill>();
   parse_animated_color(obj.value(QLatin1String("c")), fill->color, LottieColor{0.0, 0.0, 0.0, 1.0});
@@ -611,6 +1039,13 @@ std::unique_ptr<LottieGroup> parse_group(const QJsonObject& obj) {
       continue;
     }
 
+    if (type == QLatin1String("tm")) {
+      std::unique_ptr<LottieTrimPath> trim = parse_trim_path(itemObj);
+      if (trim)
+        group->trims.push_back(std::move(trim));
+      continue;
+    }
+
     std::unique_ptr<LottieNode> node = parse_shape_item(itemObj);
     if (node)
       group->children.push_back(std::move(node));
@@ -655,9 +1090,19 @@ BLStrokeJoin map_stroke_join(int join) noexcept {
   }
 }
 
-void render_group(const LottieGroup& group, BLContext& ctx, double frame, const BLMatrix2D& parent_matrix, double opacity);
+void render_group(const LottieGroup& group,
+                  BLContext& ctx,
+                  double frame,
+                  const BLMatrix2D& parent_matrix,
+                  double opacity,
+                  const std::vector<const LottieTrimPath*>& inherited_trims);
 
-void render_group(const LottieGroup& group, BLContext& ctx, double frame, const BLMatrix2D& parent_matrix, double opacity) {
+void render_group(const LottieGroup& group,
+                  BLContext& ctx,
+                  double frame,
+                  const BLMatrix2D& parent_matrix,
+                  double opacity,
+                  const std::vector<const LottieTrimPath*>& inherited_trims) {
   const double local_opacity = opacity * group.transform.opacity_at(frame);
   if (local_opacity <= 0.0)
     return;
@@ -665,6 +1110,12 @@ void render_group(const LottieGroup& group, BLContext& ctx, double frame, const 
   const BLMatrix2D matrix = lottie_matrix_multiply(parent_matrix, group.transform.matrix(frame));
   std::vector<const LottieShapePath*> path_stack;
   path_stack.reserve(8);
+  std::vector<const LottieTrimPath*> trim_stack = inherited_trims;
+  trim_stack.reserve(trim_stack.size() + group.trims.size());
+  for (const std::unique_ptr<LottieTrimPath>& trim : group.trims) {
+    if (trim && trim->enabled)
+      trim_stack.push_back(trim.get());
+  }
   bool path_consumed = false;
 
   struct DrawCommand {
@@ -673,6 +1124,7 @@ void render_group(const LottieGroup& group, BLContext& ctx, double frame, const 
     const LottieGroup* group {};
     BLMatrix2D matrix {};
     double opacity {};
+    std::vector<const LottieTrimPath*> trims;
 
     BLPath path {};
     BLFillRule fill_rule {BL_FILL_RULE_NON_ZERO};
@@ -688,12 +1140,51 @@ void render_group(const LottieGroup& group, BLContext& ctx, double frame, const 
   std::vector<DrawCommand> commands;
   commands.reserve(group.children.size());
 
+  auto build_combined_path = [&](BLPath& out) {
+    out.clear();
+    for (const LottieShapePath* path : path_stack) {
+      if (!path)
+        continue;
+      const BLPath& source = path->path_at(frame);
+      if (source.is_empty())
+        continue;
+
+      const BLPath* current = &source;
+      BLPath temp_a;
+      BLPath temp_b;
+      bool use_a = true;
+
+      for (const LottieTrimPath* trim : trim_stack) {
+        if (!trim || !trim->enabled)
+          continue;
+        BLPath& dst = use_a ? temp_a : temp_b;
+        dst.clear();
+        if (apply_trim_to_path(*current, *trim, frame, dst)) {
+          if (dst.is_empty()) {
+            current = nullptr;
+            break;
+          }
+          current = &dst;
+          use_a = !use_a;
+        }
+      }
+
+      if (!current || current->is_empty())
+        continue;
+
+      BLPath transformed(*current);
+      transformed.transform(matrix);
+      out.add_path(transformed);
+    }
+  };
+
   auto emit_group_command = [&](const LottieGroup& child_group) {
     DrawCommand cmd;
     cmd.type = DrawCommand::kGroup;
     cmd.group = &child_group;
     cmd.matrix = matrix;
     cmd.opacity = local_opacity;
+    cmd.trims = trim_stack;
     commands.push_back(std::move(cmd));
   };
 
@@ -756,17 +1247,7 @@ void render_group(const LottieGroup& group, BLContext& ctx, double frame, const 
           const BLFillRule rule = fill.fill_rule == 2 ? BL_FILL_RULE_EVEN_ODD : BL_FILL_RULE_NON_ZERO;
 
           BLPath combined;
-          for (const LottieShapePath* path : path_stack) {
-            if (!path)
-              continue;
-            const BLPath& source = path->path_at(frame);
-            if (source.is_empty())
-              continue;
-            BLPath transformed(source);
-            transformed.transform(matrix);
-            combined.add_path(transformed);
-          }
-
+          build_combined_path(combined);
           if (!combined.is_empty())
             emit_fill_command(fill, combined, rule, rgba);
         }
@@ -803,17 +1284,7 @@ void render_group(const LottieGroup& group, BLContext& ctx, double frame, const 
 
           const BLFillRule rule = gradient.fill_rule == 2 ? BL_FILL_RULE_EVEN_ODD : BL_FILL_RULE_NON_ZERO;
           BLPath combined;
-          for (const LottieShapePath* path : path_stack) {
-            if (!path)
-              continue;
-            const BLPath& source = path->path_at(frame);
-            if (source.is_empty())
-              continue;
-            BLPath transformed(source);
-            transformed.transform(matrix);
-            combined.add_path(transformed);
-          }
-
+          build_combined_path(combined);
           if (!combined.is_empty())
             emit_gradient_fill_command(combined, rule, std::move(bl_gradient));
         }
@@ -835,17 +1306,7 @@ void render_group(const LottieGroup& group, BLContext& ctx, double frame, const 
           const BLRgba32 rgba = make_rgba32(color, final_opacity);
 
           BLPath combined;
-          for (const LottieShapePath* path : path_stack) {
-            if (!path)
-              continue;
-            const BLPath& source = path->path_at(frame);
-            if (source.is_empty())
-              continue;
-            BLPath transformed(source);
-            transformed.transform(matrix);
-            combined.add_path(transformed);
-          }
-
+          build_combined_path(combined);
           if (!combined.is_empty())
             emit_stroke_command(stroke, combined, rgba, width, cap, join, miter_limit);
         }
@@ -859,7 +1320,7 @@ void render_group(const LottieGroup& group, BLContext& ctx, double frame, const 
     const DrawCommand& cmd = *it;
     switch (cmd.type) {
       case DrawCommand::kGroup:
-        render_group(*cmd.group, ctx, frame, cmd.matrix, cmd.opacity);
+        render_group(*cmd.group, ctx, frame, cmd.matrix, cmd.opacity, cmd.trims);
         break;
 
       case DrawCommand::kFill:
@@ -894,7 +1355,8 @@ void LottieComposition::render_layer_content(const LottieLayer& layer,
     return;
 
   if (layer.root) {
-    render_group(*layer.root, ctx, frame, layer_matrix, opacity);
+    const std::vector<const LottieTrimPath*> empty_trims;
+    render_group(*layer.root, ctx, frame, layer_matrix, opacity, empty_trims);
     return;
   }
 
@@ -1020,6 +1482,9 @@ LottieFill::LottieFill()
 
 LottieGradientFill::LottieGradientFill()
   : LottieNode(LottieNode::kGradientFill) {}
+
+LottieTrimPath::LottieTrimPath()
+  : LottieNode(LottieNode::kTrim) {}
 
 LottieStroke::LottieStroke()
   : LottieNode(LottieNode::kStroke) {}

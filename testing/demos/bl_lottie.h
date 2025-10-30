@@ -86,7 +86,8 @@ struct LottieNode {
     kPath,
     kFill,
     kStroke,
-    kGradientFill
+    kGradientFill,
+    kTrim
   };
 
   explicit LottieNode(Type type) : type(type) {}
@@ -145,6 +146,15 @@ struct LottieGradientFill : public LottieNode {
   std::vector<LottieGradientStop> stops;
 };
 
+struct LottieTrimPath : public LottieNode {
+  LottieTrimPath();
+  LottieAnimatedValue<double> start;
+  LottieAnimatedValue<double> end;
+  LottieAnimatedValue<double> offset;
+  int mode {1};
+  bool enabled {true};
+};
+
 struct LottieImageAsset {
   QString id;
   BLImage image;
@@ -166,6 +176,7 @@ struct LottieGroup : public LottieNode {
   LottieGroup();
   LottieTransform transform;
   std::vector<std::unique_ptr<LottieNode>> children;
+  std::vector<std::unique_ptr<LottieTrimPath>> trims;
 };
 
 struct LottieLayer {
