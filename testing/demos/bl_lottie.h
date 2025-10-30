@@ -229,8 +229,6 @@ struct LottieLayer {
   bool hidden {};
   double in_point {};
   double out_point {};
-  double start_time {};
-  double time_stretch {1.0};
   LottieTransform transform;
   std::vector<LottieMask> masks;
   bool is_solid {};

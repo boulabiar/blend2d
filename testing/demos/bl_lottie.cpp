@@ -2186,10 +2186,6 @@ bool LottieComposition::load_from_file(const QString& path, QString* error_messa
       layer.matte_mode = 0;
       layer.in_point = layerObj.value(QLatin1String("ip")).toDouble(_in_point);
       layer.out_point = layerObj.value(QLatin1String("op")).toDouble(_out_point);
-      layer.start_time = layerObj.value(QLatin1String("st")).toDouble(0.0);
-      layer.time_stretch = layerObj.value(QLatin1String("sr")).toDouble(1.0);
-      if (!std::isfinite(layer.time_stretch) || layer.time_stretch == 0.0)
-        layer.time_stretch = 1.0;
       parse_transform_object(layerObj.value(QLatin1String("ks")).toObject(), layer.transform);
 
       const QJsonArray masks_array = layerObj.value(QLatin1String("masksProperties")).toArray();
@@ -2320,23 +2316,13 @@ void LottieComposition::render_layer_array(const std::vector<LottieLayer>& layer
   const int canvas_width = std::max(1, int(std::ceil(target_size.w)));
   const int canvas_height = std::max(1, int(std::ceil(target_size.h)));
 
-  std::vector<double> layer_frames(layers.size());
-  for (size_t i = 0; i < layers.size(); ++i) {
-    const LottieLayer& layer = layers[i];
-    const double stretch = (layer.time_stretch == 0.0 || !std::isfinite(layer.time_stretch)) ? 1.0 : layer.time_stretch;
-    double local_frame = (frame - layer.start_time) / stretch;
-    if (!std::isfinite(local_frame))
-      local_frame = frame;
-    layer_frames[i] = local_frame;
-  }
-
   std::vector<BLMatrix2D> matrix_cache(layers.size());
   std::vector<uint8_t> matrix_valid(layers.size(), 0);
   std::function<BLMatrix2D(size_t)> resolve_matrix = [&](size_t index) -> BLMatrix2D {
     if (matrix_valid[index])
       return matrix_cache[index];
 
-    BLMatrix2D mat = layers[index].transform.matrix(layer_frames[index]);
+    BLMatrix2D mat = layers[index].transform.matrix(frame);
     const int parent = layers[index].parent;
     if (parent >= 0)
       mat = lottie_matrix_multiply(resolve_matrix(size_t(parent)), mat);
@@ -2352,7 +2338,7 @@ void LottieComposition::render_layer_array(const std::vector<LottieLayer>& layer
     if (opacity_valid[index])
       return opacity_cache[index];
 
-    double value = layers[index].transform.opacity_at(layer_frames[index]);
+    double value = layers[index].transform.opacity_at(frame);
     if (value < 0.0) value = 0.0;
     if (value > 1.0) value = 1.0;
 
@@ -2397,21 +2383,20 @@ void LottieComposition::render_layer_array(const std::vector<LottieLayer>& layer
 
       auto render_to_image = [&](const LottieLayer& srcLayer,
                                  const BLMatrix2D& matrix,
-                                 double op,
-                                 double src_frame) -> BLImage {
+                                 double op) -> BLImage {
         BLImage img;
         if (img.create(canvas_width, canvas_height, BL_FORMAT_PRGB32) != BL_SUCCESS)
           return img;
         {
           BLContext imgCtx(img);
           imgCtx.clear_all();
-          render_layer_content(srcLayer, imgCtx, src_frame, matrix, op);
+          render_layer_content(srcLayer, imgCtx, frame, matrix, op);
         }
         return img;
       };
 
-      const BLImage matte_image = render_to_image(matte_layer, matte_matrix, matte_opacity, layer_frames[size_t(matte_index)]);
-      BLImage content_image = render_to_image(layer, layer_matrix, layer_opacity, layer_frames[i]);
+      const BLImage matte_image = render_to_image(matte_layer, matte_matrix, matte_opacity);
+      BLImage content_image = render_to_image(layer, layer_matrix, layer_opacity);
 
       if (matte_image && content_image) {
         if (layer.matte_mode == 1 || layer.matte_mode == 2) {
@@ -2424,6 +2409,6 @@ void LottieComposition::render_layer_array(const std::vector<LottieLayer>& layer
       continue;
     }
 
-    render_layer_content(layer, ctx, layer_frames[i], layer_matrix, layer_opacity);
+    render_layer_content(layer, ctx, frame, layer_matrix, layer_opacity);
   }
 }
