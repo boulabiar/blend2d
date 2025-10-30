@@ -202,9 +202,7 @@ void parse_transform_object(const QJsonObject& obj, LottieTransform& transform) 
   parse_animated_double(obj.value(QLatin1String("sa")), transform.skew_axis, 0.0);
 }
 
-BLPath build_path_from_data(const QJsonObject& data) {
-  BLPath path;
-
+bool parse_shape_data(const QJsonObject& data, LottieShapePath::ShapeData& dst) {
   QJsonArray vertices = data.value(QLatin1String("v")).toArray();
   QJsonArray in_tangents = data.value(QLatin1String("i")).toArray();
   QJsonArray out_tangents = data.value(QLatin1String("o")).toArray();
@@ -212,10 +210,10 @@ BLPath build_path_from_data(const QJsonObject& data) {
 
   int count = vertices.size();
   if (count == 0)
-    return path;
+    return false;
 
   if (in_tangents.size() != count || out_tangents.size() != count)
-    return BLPath();
+    return false;
 
   auto point_from = [](const QJsonArray& arr) -> LottieVec2 {
     LottieVec2 v {};
@@ -226,14 +224,32 @@ BLPath build_path_from_data(const QJsonObject& data) {
     return v;
   };
 
-  LottieVec2 first = point_from(vertices.first().toArray());
-  path.move_to(first.x, first.y);
+  dst.vertices.resize(count);
+  dst.in_tangents.resize(count);
+  dst.out_tangents.resize(count);
 
-  for (int i = 0; i < count - 1; i++) {
-    LottieVec2 p0 = point_from(vertices.at(i).toArray());
-    LottieVec2 p1 = point_from(vertices.at(i + 1).toArray());
-    LottieVec2 o0 = point_from(out_tangents.at(i).toArray());
-    LottieVec2 i1 = point_from(in_tangents.at(i + 1).toArray());
+  for (int i = 0; i < count; i++) {
+    dst.vertices[i] = point_from(vertices.at(i).toArray());
+    dst.in_tangents[i] = point_from(in_tangents.at(i).toArray());
+    dst.out_tangents[i] = point_from(out_tangents.at(i).toArray());
+  }
+
+  dst.closed = closed;
+  return true;
+}
+
+BLPath build_path_from_shape(const LottieShapePath::ShapeData& shape) {
+  BLPath path;
+  size_t count = shape.vertices.size();
+  if (count == 0)
+    return path;
+
+  path.move_to(shape.vertices[0].x, shape.vertices[0].y);
+  for (size_t i = 0; i + 1 < count; i++) {
+    const LottieVec2& p0 = shape.vertices[i];
+    const LottieVec2& p1 = shape.vertices[i + 1];
+    const LottieVec2& o0 = shape.out_tangents[i];
+    const LottieVec2& i1 = shape.in_tangents[i + 1];
 
     path.cubic_to(p0.x + o0.x,
                   p0.y + o0.y,
@@ -243,10 +259,11 @@ BLPath build_path_from_data(const QJsonObject& data) {
                   p1.y);
   }
 
-  if (closed) {
-    LottieVec2 last = point_from(vertices.last().toArray());
-    LottieVec2 o_last = point_from(out_tangents.last().toArray());
-    LottieVec2 i_first = point_from(in_tangents.first().toArray());
+  if (shape.closed && count > 1) {
+    const LottieVec2& last = shape.vertices.back();
+    const LottieVec2& o_last = shape.out_tangents.back();
+    const LottieVec2& first = shape.vertices.front();
+    const LottieVec2& i_first = shape.in_tangents.front();
 
     path.cubic_to(last.x + o_last.x,
                   last.y + o_last.y,
@@ -285,12 +302,11 @@ std::unique_ptr<LottieShapePath> parse_shape_path(const QJsonObject& obj) {
     if (data.isEmpty())
       return nullptr;
 
-    BLPath built = build_path_from_data(data);
-    if (built.is_empty())
+    if (!parse_shape_data(data, path->shape))
       return nullptr;
 
     path->animated = false;
-    path->path = std::move(built);
+    path->cache_valid = false;
     return path;
   }
 
@@ -303,13 +319,14 @@ std::unique_ptr<LottieShapePath> parse_shape_path(const QJsonObject& obj) {
     if (data.isEmpty())
       continue;
 
-    BLPath built = build_path_from_data(data);
-    if (built.is_empty())
+    LottieShapePath::ShapeData shape_data;
+    if (!parse_shape_data(data, shape_data))
       continue;
 
     LottieShapePath::Keyframe kf;
     kf.time = key.value(QLatin1String("t")).toDouble(path->keyframes.empty() ? 0.0 : path->keyframes.back().time);
-    kf.path = std::move(built);
+    kf.hold = key.value(QLatin1String("h")).toInt() == 1;
+    kf.shape = std::move(shape_data);
     path->keyframes.push_back(std::move(kf));
   }
 
@@ -318,12 +335,11 @@ std::unique_ptr<LottieShapePath> parse_shape_path(const QJsonObject& obj) {
     if (data.isEmpty())
       return nullptr;
 
-    BLPath built = build_path_from_data(data);
-    if (built.is_empty())
+    if (!parse_shape_data(data, path->shape))
       return nullptr;
 
     path->animated = false;
-    path->path = std::move(built);
+    path->cache_valid = false;
     return path;
   }
 
@@ -332,7 +348,8 @@ std::unique_ptr<LottieShapePath> parse_shape_path(const QJsonObject& obj) {
   });
 
   path->animated = true;
-  path->path = path->keyframes.front().path;
+  path->shape = path->keyframes.front().shape;
+  path->cache_valid = false;
   return path;
 }
 
@@ -365,15 +382,19 @@ std::unique_ptr<LottieShapePath> parse_rectangle(const QJsonObject& obj) {
   auto path = std::make_unique<LottieShapePath>();
   BLGeometryDirection direction = obj.value(QLatin1String("d")).toInt(1) == 1 ? BL_GEOMETRY_DIRECTION_CW : BL_GEOMETRY_DIRECTION_CCW;
 
+  BLPath built;
   if (radius <= 0.0) {
-    path->path.add_rect(x, y, sx, sy, direction);
+    built.add_rect(x, y, sx, sy, direction);
   }
   else {
     double clamped = std::min(radius, std::min(std::abs(sx), std::abs(sy)) * 0.5);
     BLRoundRect rr(x, y, sx, sy, clamped, clamped);
-    path->path.add_round_rect(rr, direction);
+    built.add_round_rect(rr, direction);
   }
 
+  path->animated = false;
+  path->cached_path = std::move(built);
+  path->cache_valid = true;
   return path;
 }
 
@@ -398,8 +419,13 @@ std::unique_ptr<LottieShapePath> parse_ellipse(const QJsonObject& obj) {
 
   auto path = std::make_unique<LottieShapePath>();
   BLGeometryDirection direction = obj.value(QLatin1String("d")).toInt(1) == 1 ? BL_GEOMETRY_DIRECTION_CW : BL_GEOMETRY_DIRECTION_CCW;
-  path->path.add_ellipse(BLEllipse(cx, cy, rx, ry), direction);
 
+  BLPath built;
+  built.add_ellipse(BLEllipse(cx, cy, rx, ry), direction);
+
+  path->animated = false;
+  path->cached_path = std::move(built);
+  path->cache_valid = true;
   return path;
 }
 
@@ -886,20 +912,69 @@ LottieShapePath::LottieShapePath()
   : LottieNode(LottieNode::kPath) {}
 
 const BLPath& LottieShapePath::path_at(double frame) const {
-  if (!animated || keyframes.empty())
-    return path;
+  auto refresh_cache = [&](const ShapeData& data) -> const BLPath& {
+    cached_path = build_path_from_shape(data);
+    cached_frame = frame;
+    cache_valid = true;
+    return cached_path;
+  };
 
-  if (frame <= keyframes.front().time)
-    return keyframes.front().path;
-
-  for (size_t i = 0; i + 1 < keyframes.size(); i++) {
-    const Keyframe& current = keyframes[i];
-    const Keyframe& next = keyframes[i + 1];
-    if (frame < next.time)
-      return current.path;
+  if (!animated) {
+    if (cache_valid)
+      return cached_path;
+    if (!shape.vertices.empty())
+      return refresh_cache(shape);
+    return cached_path;
   }
 
-  return keyframes.back().path;
+  if (cache_valid && cached_frame == frame)
+    return cached_path;
+
+  const ShapeData* shape_ptr = nullptr;
+
+  if (frame <= keyframes.front().time) {
+    shape_ptr = &keyframes.front().shape;
+  }
+  else if (frame >= keyframes.back().time) {
+    shape_ptr = &keyframes.back().shape;
+  }
+  else {
+    for (size_t i = 0; i + 1 < keyframes.size(); i++) {
+      const Keyframe& k0 = keyframes[i];
+      const Keyframe& k1 = keyframes[i + 1];
+      if (frame < k1.time) {
+        if (k0.hold || k0.shape.vertices.size() != k1.shape.vertices.size()) {
+          shape_ptr = &k0.shape;
+        }
+        else {
+          double denom = k1.time - k0.time;
+          double t = denom != 0.0 ? (frame - k0.time) / denom : 0.0;
+          if (t < 0.0) t = 0.0;
+          if (t > 1.0) t = 1.0;
+
+          size_t count = k0.shape.vertices.size();
+          interpolated_shape.vertices.resize(count);
+          interpolated_shape.in_tangents.resize(count);
+          interpolated_shape.out_tangents.resize(count);
+          interpolated_shape.closed = k0.shape.closed;
+
+          for (size_t j = 0; j < count; j++) {
+            interpolated_shape.vertices[j] = lottie_lerp(k0.shape.vertices[j], k1.shape.vertices[j], t);
+            interpolated_shape.in_tangents[j] = lottie_lerp(k0.shape.in_tangents[j], k1.shape.in_tangents[j], t);
+            interpolated_shape.out_tangents[j] = lottie_lerp(k0.shape.out_tangents[j], k1.shape.out_tangents[j], t);
+          }
+
+          shape_ptr = &interpolated_shape;
+        }
+        break;
+      }
+    }
+  }
+
+  if (!shape_ptr)
+    shape_ptr = &keyframes.back().shape;
+
+  return refresh_cache(*shape_ptr);
 }
 
 LottieFill::LottieFill()

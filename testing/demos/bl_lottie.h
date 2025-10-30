@@ -7,6 +7,7 @@
 #include <QtCore/QJsonObject>
 #include <QtCore/QString>
 
+#include <limits>
 #include <memory>
 #include <vector>
 
@@ -95,16 +96,29 @@ struct LottieNode {
 };
 
 struct LottieShapePath : public LottieNode {
+  struct ShapeData {
+    std::vector<LottieVec2> vertices;
+    std::vector<LottieVec2> in_tangents;
+    std::vector<LottieVec2> out_tangents;
+    bool closed {};
+  };
+
   struct Keyframe {
     double time {};
-    BLPath path;
+    bool hold {};
+    ShapeData shape;
   };
 
   LottieShapePath();
 
   bool animated {};
-  BLPath path;
+  ShapeData shape;
   std::vector<Keyframe> keyframes;
+
+  mutable BLPath cached_path;
+  mutable double cached_frame {std::numeric_limits<double>::quiet_NaN()};
+  mutable bool cache_valid {};
+  mutable ShapeData interpolated_shape;
 
   const BLPath& path_at(double frame) const;
 };
