@@ -95,8 +95,18 @@ struct LottieNode {
 };
 
 struct LottieShapePath : public LottieNode {
+  struct Keyframe {
+    double time {};
+    BLPath path;
+  };
+
   LottieShapePath();
+
+  bool animated {};
   BLPath path;
+  std::vector<Keyframe> keyframes;
+
+  const BLPath& path_at(double frame) const;
 };
 
 struct LottieFill : public LottieNode {
