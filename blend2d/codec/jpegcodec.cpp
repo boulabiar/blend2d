@@ -1587,6 +1587,14 @@ void jpeg_codec_on_init(BLRuntimeContext* rt, BLArray<BLImageCodec>* codecs) noe
   opts.upsample_2x2 = upsample_2x2;
   opts.upsample_any = upsample_generic;
 
+#ifdef BL_BUILD_OPT_AVX2
+  if (bl_runtime_has_avx2(rt)) {
+    opts.upsample_1x2 = upsample_1x2_avx2;
+    opts.upsample_2x1 = upsample_2x1_avx2;
+    opts.upsample_2x2 = upsample_2x2_avx2;
+  }
+#endif
+
   // Initialize JPEG codec.
   jpeg_codec.virt.base.destroy = codec_destroy_impl;
   jpeg_codec.virt.base.get_property = bl_object_impl_get_property;

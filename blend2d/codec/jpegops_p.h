@@ -91,6 +91,15 @@ BL_HIDDEN void BL_CDECL idct8_sse2(uint8_t* dst, intptr_t dst_stride, const int1
 BL_HIDDEN void BL_CDECL rgb32_from_ycbcr8_sse2(uint8_t* dst, const uint8_t* pY, const uint8_t* pCb, const uint8_t* pCr, uint32_t count) noexcept;
 #endif
 
+// bl::Jpeg::Opts - AVX2
+// ========================
+
+#ifdef BL_BUILD_OPT_AVX2
+BL_HIDDEN uint8_t* BL_CDECL upsample_1x2_avx2(uint8_t* dst, uint8_t* src0, uint8_t* src1, uint32_t w, uint32_t hs) noexcept;
+BL_HIDDEN uint8_t* BL_CDECL upsample_2x1_avx2(uint8_t* dst, uint8_t* src0, uint8_t* src1, uint32_t w, uint32_t hs) noexcept;
+BL_HIDDEN uint8_t* BL_CDECL upsample_2x2_avx2(uint8_t* dst, uint8_t* src0, uint8_t* src1, uint32_t w, uint32_t hs) noexcept;
+#endif
+
 } // {bl::Jpeg}
 
 //! \}

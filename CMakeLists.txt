@@ -217,6 +217,8 @@ set(BLEND2D_SRC_LIST
   blend2d/codec/jpeghuffman_p.h
   blend2d/codec/jpegops.cpp
   blend2d/codec/jpegops_sse2.cpp
+  blend2d/codec/jpegops_avx2.cpp
+  blend2d/codec/jpegops_test.cpp
   blend2d/codec/jpegops_p.h
   blend2d/codec/pngcodec.cpp
   blend2d/codec/pngcodec_p.h
