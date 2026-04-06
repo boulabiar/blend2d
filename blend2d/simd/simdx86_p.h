@@ -3610,6 +3610,10 @@ BL_INLINE_NODEBUG void simd_storea(void* dst, __m512 src) noexcept { _mm512_stor
 BL_INLINE_NODEBUG void simd_storeu(void* dst, __m512 src) noexcept { _mm512_storeu_ps(static_cast<float*>(dst), src); }
 BL_INLINE_NODEBUG void simd_storea(void* dst, __m512d src) noexcept { _mm512_store_pd(static_cast<double*>(dst), src); }
 BL_INLINE_NODEBUG void simd_storeu(void* dst, __m512d src) noexcept { _mm512_storeu_pd(static_cast<double*>(dst), src); }
+
+// Masked load/store (AVX-512BW).
+BL_INLINE_NODEBUG __m512i simd_maskz_loadu_epi8(__mmask64 k, const void* src) noexcept { return _mm512_maskz_loadu_epi8(k, src); }
+BL_INLINE_NODEBUG void simd_mask_storeu_epi8(void* dst, __mmask64 k, __m512i src) noexcept { _mm512_mask_storeu_epi8(dst, k, src); }
 #endif // BL_TARGET_OPT_AVX512
 
 } // {Internal}
@@ -4840,6 +4844,9 @@ template<typename V> BL_INLINE_NODEBUG V loada_256_i8_i16(const void* src) noexc
 template<typename V> BL_INLINE_NODEBUG V loadu_256_i8_i16(const void* src) noexcept { return from_simd<V>(I::simd_loadu_256_i8_i16(src)); }
 template<typename V> BL_INLINE_NODEBUG V loada_256_u8_u16(const void* src) noexcept { return from_simd<V>(I::simd_loada_256_u8_u16(src)); }
 template<typename V> BL_INLINE_NODEBUG V loadu_256_u8_u16(const void* src) noexcept { return from_simd<V>(I::simd_loadu_256_u8_u16(src)); }
+
+template<typename V> BL_INLINE_NODEBUG V maskz_loadu_u8(__mmask64 k, const void* src) noexcept { return V{I::simd_maskz_loadu_epi8(k, src)}; }
+template<typename V> BL_INLINE_NODEBUG void mask_storeu_u8(void* dst, __mmask64 k, const V& src) noexcept { I::simd_mask_storeu_epi8(dst, k, src.v); }
 #endif // BL_TARGET_OPT_AVX512
 
 // SIMD - Public - Load & Store Operations (Native)

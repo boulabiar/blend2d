@@ -100,6 +100,15 @@ BL_HIDDEN uint8_t* BL_CDECL upsample_2x1_avx2(uint8_t* dst, uint8_t* src0, uint8
 BL_HIDDEN uint8_t* BL_CDECL upsample_2x2_avx2(uint8_t* dst, uint8_t* src0, uint8_t* src1, uint32_t w, uint32_t hs) noexcept;
 #endif
 
+// bl::Jpeg::Opts - AVX-512
+// ========================
+
+#ifdef BL_BUILD_OPT_AVX512
+BL_HIDDEN uint8_t* BL_CDECL upsample_1x2_avx512(uint8_t* dst, uint8_t* src0, uint8_t* src1, uint32_t w, uint32_t hs) noexcept;
+BL_HIDDEN uint8_t* BL_CDECL upsample_2x1_avx512(uint8_t* dst, uint8_t* src0, uint8_t* src1, uint32_t w, uint32_t hs) noexcept;
+BL_HIDDEN uint8_t* BL_CDECL upsample_2x2_avx512(uint8_t* dst, uint8_t* src0, uint8_t* src1, uint32_t w, uint32_t hs) noexcept;
+#endif
+
 } // {bl::Jpeg}
 
 //! \}

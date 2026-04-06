@@ -137,6 +137,14 @@ UNIT(codec_jpeg_upsample, BL_TEST_GROUP_IMAGE_CODEC_OPS) {
     test_upsample_2x2(upsample_2x2, upsample_2x2_avx2, "AVX2");
   }
 #endif
+
+#ifdef BL_BUILD_OPT_AVX512
+  if (bl_runtime_has_avx512(&bl_runtime_context)) {
+    test_upsample_1x2(upsample_1x2, upsample_1x2_avx512, "AVX-512");
+    test_upsample_2x1(upsample_2x1, upsample_2x1_avx512, "AVX-512");
+    test_upsample_2x2(upsample_2x2, upsample_2x2_avx512, "AVX-512");
+  }
+#endif
 }
 
 } // {bl::Jpeg::Tests}
