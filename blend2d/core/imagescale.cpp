@@ -917,9 +917,13 @@ BLResult ImageScaleContext::process_vert_data(uint8_t* dst_line, intptr_t dst_st
 // bl::ImageScale - Runtime Registration
 // =====================================
 
-void bl_image_scale_rt_init(BLRuntimeContext* rt) noexcept {
-  bl_unused(rt);
+#ifdef BL_BUILD_OPT_AVX2
+namespace bl {
+BL_HIDDEN void BL_CDECL image_scale_vert_prgb32_avx2(const ImageScaleContext::Data* d, uint8_t* dst_line, intptr_t dst_stride, const uint8_t* src_line, intptr_t src_stride) noexcept;
+} // {bl}
+#endif
 
+void bl_image_scale_rt_init(BLRuntimeContext* rt) noexcept {
   bl::image_scale_ops.weights = bl::image_scale_weights;
 
   bl::image_scale_ops.horz[BL_FORMAT_PRGB32] = bl::image_scale_horz_prgb32;
@@ -929,4 +933,10 @@ void bl_image_scale_rt_init(BLRuntimeContext* rt) noexcept {
   bl::image_scale_ops.vert[BL_FORMAT_PRGB32] = bl::image_scale_vert_prgb32;
   bl::image_scale_ops.vert[BL_FORMAT_XRGB32] = bl::image_scale_vert_xrgb32;
   bl::image_scale_ops.vert[BL_FORMAT_A8    ] = bl::image_scale_vert_a8;
+
+#ifdef BL_BUILD_OPT_AVX2
+  if (bl_runtime_has_avx2(rt)) {
+    bl::image_scale_ops.vert[BL_FORMAT_PRGB32] = bl::image_scale_vert_prgb32_avx2;
+  }
+#endif
 }

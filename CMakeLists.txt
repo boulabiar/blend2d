@@ -160,6 +160,7 @@ set(BLEND2D_SRC_LIST
   blend2d/core/imageencoder.cpp
   blend2d/core/imageencoder.h
   blend2d/core/imagescale.cpp
+  blend2d/core/imagescale_avx2.cpp
   blend2d/core/imagescale_p.h
   blend2d/core/matrix.cpp
   blend2d/core/matrix_avx.cpp
