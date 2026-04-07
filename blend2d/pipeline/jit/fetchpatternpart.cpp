@@ -1682,8 +1682,11 @@ FetchAffinePatternPart::FetchAffinePatternPart(PipeCompiler* pc, FetchType fetch
       break;
 
     case FetchType::kPatternAffineBIAny:
+      _max_pixels = 4;
+      add_part_flags(PipePartFlags::kExpensive);
+      break;
+
     case FetchType::kPatternAffineBIOpt:
-      // TODO: [JIT] OPTIMIZATION: Implement fetch4.
       _max_pixels = 1;
       add_part_flags(PipePartFlags::kExpensive);
       break;
@@ -2236,6 +2239,177 @@ void FetchAffinePatternPart::fetch(Pixel& p, PixelCount n, PixelFlags flags, Pix
           });
 
           FetchUtils::satisfy_pixels(pc, p, flags);
+          break;
+        }
+
+        case FetchType::kPatternAffineBIAny: {
+          // Bilinear fetch4: process 4 pixels by calling the 1-pixel bilinear
+          // blend kernel 4 times, with coordinate stepping interleaved for ILP.
+          //
+          // Coordinate layout (same as NN fetch4):
+          //   px_py = pixel 0 coords, qx_qy = pixel 1 coords (one ahead)
+          //   After fetching pixels 0,1: advance both by xx2_xy2
+          //   Then px_py = pixel 2, qx_qy = pixel 3
+          //   After fetching pixels 2,3: advance both by xx2_xy2
+
+          if (p.isRGBA32()) {
+            Vec v_idx0 = pc->new_vec128("v_idx0");
+            Vec v_idx1 = pc->new_vec128("v_idx1");
+            Vec v_idx2 = pc->new_vec128("v_idx2");
+            Vec v_idx3 = pc->new_vec128("v_idx3");
+            Vec v_weights0 = pc->new_vec128("v_weights0");
+            Vec v_weights1 = pc->new_vec128("v_weights1");
+            Vec v_weights2 = pc->new_vec128("v_weights2");
+            Vec v_weights3 = pc->new_vec128("v_weights3");
+            Vec v_msk = pc->new_vec128("v_msk");
+
+            Vec pix0 = pc->new_vec128("pix0");
+            Vec pix1 = pc->new_vec128("pix1");
+            Vec pix2 = pc->new_vec128("pix2");
+            Vec pix3 = pc->new_vec128("pix3");
+
+            // --- Pixel 0: extract indices and weights from px_py ---
+            pc->v_swizzle_u32x4(v_idx0, f->px_py, swizzle(3, 3, 1, 1));
+            pc->v_sub_i32(v_idx0, v_idx0, pc->simd_const(&ct.p_FFFFFFFF00000000, Bcst::kNA, v_idx0));
+
+#if defined(BL_JIT_ARCH_X86)
+            if (!pc->has_ssse3()) {
+              pc->v_swizzle_u16x4(v_weights0, f->px_py, swizzle(1, 1, 1, 1));
+              pc->v_srli_u16(v_weights0, v_weights0, 8);
+            }
+            else
+#endif
+            {
+              pc->v_swizzlev_u8(v_weights0, f->px_py, pc->simd_const(&ct.swizu8_xxxx1xxxxxxx0xxx_to_z1z1z1z1z0z0z0z0, Bcst::kNA, v_weights0));
+            }
+
+            // Advance px_py and normalize.
+            pc->v_add_i64(f->px_py, f->px_py, f->xx2_xy2);
+            pc->v_cmp_gt_i32(v_msk, f->px_py, f->ox_oy);
+            pc->v_and_i32(v_msk, v_msk, f->rx_ry);
+            pc->v_sub_i32(f->px_py, f->px_py, v_msk);
+
+            // Clamp and finalize weights for pixel 0.
+            clamp_vec_idx_32(v_idx0, v_idx0, kClampStepA_BI);
+            pc->v_xor_i64(v_weights0, v_weights0, pc->simd_const(&ct.p_FFFFFFFF00000000, Bcst::k64, v_weights0));
+            clamp_vec_idx_32(v_idx0, v_idx0, kClampStepB_BI);
+            pc->v_add_u16(v_weights0, v_weights0, pc->simd_const(&ct.p_0101010100000000, Bcst::kNA, v_weights0));
+            clamp_vec_idx_32(v_idx0, v_idx0, kClampStepC_BI);
+
+            // --- Pixel 1: extract indices and weights from qx_qy ---
+            pc->v_swizzle_u32x4(v_idx1, f->qx_qy, swizzle(3, 3, 1, 1));
+            pc->v_sub_i32(v_idx1, v_idx1, pc->simd_const(&ct.p_FFFFFFFF00000000, Bcst::kNA, v_idx1));
+
+#if defined(BL_JIT_ARCH_X86)
+            if (!pc->has_ssse3()) {
+              pc->v_swizzle_u16x4(v_weights1, f->qx_qy, swizzle(1, 1, 1, 1));
+              pc->v_srli_u16(v_weights1, v_weights1, 8);
+            }
+            else
+#endif
+            {
+              pc->v_swizzlev_u8(v_weights1, f->qx_qy, pc->simd_const(&ct.swizu8_xxxx1xxxxxxx0xxx_to_z1z1z1z1z0z0z0z0, Bcst::kNA, v_weights1));
+            }
+
+            // Advance qx_qy and normalize.
+            pc->v_add_i64(f->qx_qy, f->qx_qy, f->xx2_xy2);
+            pc->v_cmp_gt_i32(v_msk, f->qx_qy, f->ox_oy);
+            pc->v_and_i32(v_msk, v_msk, f->rx_ry);
+            pc->v_sub_i32(f->qx_qy, f->qx_qy, v_msk);
+
+            // Clamp and finalize weights for pixel 1.
+            clamp_vec_idx_32(v_idx1, v_idx1, kClampStepA_BI);
+            pc->v_xor_i64(v_weights1, v_weights1, pc->simd_const(&ct.p_FFFFFFFF00000000, Bcst::k64, v_weights1));
+            clamp_vec_idx_32(v_idx1, v_idx1, kClampStepB_BI);
+            pc->v_add_u16(v_weights1, v_weights1, pc->simd_const(&ct.p_0101010100000000, Bcst::kNA, v_weights1));
+            clamp_vec_idx_32(v_idx1, v_idx1, kClampStepC_BI);
+
+            // --- Blend pixels 0 and 1 (interleaved for ILP) ---
+            FetchUtils::filter_bilinear_argb32_1x(pc, pix0, f->srctop, f->stride, v_idx0, v_weights0);
+            FetchUtils::filter_bilinear_argb32_1x(pc, pix1, f->srctop, f->stride, v_idx1, v_weights1);
+
+            // --- Pixel 2: extract from the advanced px_py ---
+            pc->v_swizzle_u32x4(v_idx2, f->px_py, swizzle(3, 3, 1, 1));
+            pc->v_sub_i32(v_idx2, v_idx2, pc->simd_const(&ct.p_FFFFFFFF00000000, Bcst::kNA, v_idx2));
+
+#if defined(BL_JIT_ARCH_X86)
+            if (!pc->has_ssse3()) {
+              pc->v_swizzle_u16x4(v_weights2, f->px_py, swizzle(1, 1, 1, 1));
+              pc->v_srli_u16(v_weights2, v_weights2, 8);
+            }
+            else
+#endif
+            {
+              pc->v_swizzlev_u8(v_weights2, f->px_py, pc->simd_const(&ct.swizu8_xxxx1xxxxxxx0xxx_to_z1z1z1z1z0z0z0z0, Bcst::kNA, v_weights2));
+            }
+
+            // Advance px_py and normalize.
+            pc->v_add_i64(f->px_py, f->px_py, f->xx2_xy2);
+            pc->v_cmp_gt_i32(v_msk, f->px_py, f->ox_oy);
+            pc->v_and_i32(v_msk, v_msk, f->rx_ry);
+            pc->v_sub_i32(f->px_py, f->px_py, v_msk);
+
+            clamp_vec_idx_32(v_idx2, v_idx2, kClampStepA_BI);
+            pc->v_xor_i64(v_weights2, v_weights2, pc->simd_const(&ct.p_FFFFFFFF00000000, Bcst::k64, v_weights2));
+            clamp_vec_idx_32(v_idx2, v_idx2, kClampStepB_BI);
+            pc->v_add_u16(v_weights2, v_weights2, pc->simd_const(&ct.p_0101010100000000, Bcst::kNA, v_weights2));
+            clamp_vec_idx_32(v_idx2, v_idx2, kClampStepC_BI);
+
+            // --- Pixel 3: extract from the advanced qx_qy ---
+            pc->v_swizzle_u32x4(v_idx3, f->qx_qy, swizzle(3, 3, 1, 1));
+            pc->v_sub_i32(v_idx3, v_idx3, pc->simd_const(&ct.p_FFFFFFFF00000000, Bcst::kNA, v_idx3));
+
+#if defined(BL_JIT_ARCH_X86)
+            if (!pc->has_ssse3()) {
+              pc->v_swizzle_u16x4(v_weights3, f->qx_qy, swizzle(1, 1, 1, 1));
+              pc->v_srli_u16(v_weights3, v_weights3, 8);
+            }
+            else
+#endif
+            {
+              pc->v_swizzlev_u8(v_weights3, f->qx_qy, pc->simd_const(&ct.swizu8_xxxx1xxxxxxx0xxx_to_z1z1z1z1z0z0z0z0, Bcst::kNA, v_weights3));
+            }
+
+            // Advance qx_qy and normalize.
+            pc->v_add_i64(f->qx_qy, f->qx_qy, f->xx2_xy2);
+            pc->v_cmp_gt_i32(v_msk, f->qx_qy, f->ox_oy);
+            pc->v_and_i32(v_msk, v_msk, f->rx_ry);
+            pc->v_sub_i32(f->qx_qy, f->qx_qy, v_msk);
+
+            clamp_vec_idx_32(v_idx3, v_idx3, kClampStepA_BI);
+            pc->v_xor_i64(v_weights3, v_weights3, pc->simd_const(&ct.p_FFFFFFFF00000000, Bcst::k64, v_weights3));
+            clamp_vec_idx_32(v_idx3, v_idx3, kClampStepB_BI);
+            pc->v_add_u16(v_weights3, v_weights3, pc->simd_const(&ct.p_0101010100000000, Bcst::kNA, v_weights3));
+            clamp_vec_idx_32(v_idx3, v_idx3, kClampStepC_BI);
+
+            // --- Blend pixels 2 and 3 ---
+            FetchUtils::filter_bilinear_argb32_1x(pc, pix2, f->srctop, f->stride, v_idx2, v_weights2);
+            FetchUtils::filter_bilinear_argb32_1x(pc, pix3, f->srctop, f->stride, v_idx3, v_weights3);
+
+            // --- Pack 4 results from u16 to u8 and combine ---
+            // Each pixN has the bilinear result as u16 in the low 4 words (with
+            // duplicates in the high 4 words from the horizontal add pattern).
+            // Pack pairs to u8: packuswb combines low halves of both operands.
+            pc->v_packs_i16_u8(pix0, pix0, pix1);  // [pix1_bytes | pix0_bytes | pix1_bytes | pix0_bytes]
+            pc->v_packs_i16_u8(pix2, pix2, pix3);  // [pix3_bytes | pix2_bytes | pix3_bytes | pix2_bytes]
+
+            // Extract the packed ARGB32 pixels: each is a dword.
+            // After packuswb, pixel 0 is in dword 0, pixel 1 is in dword 2.
+            // Combine into a single register with 4 packed pixels.
+            pc->v_interleave_lo_u32(pix0, pix0, pix2);  // [pix2_d0, pix0_d0, pix2_d0, pix0_d0] ... not quite right
+
+            // Use shuffle to pick the correct dwords from each packed result.
+            // pix0 after pack = [p1_dup | p0_dup | p1 | p0] as bytes
+            // pix2 after pack = [p3_dup | p2_dup | p3 | p2] as bytes
+            // We want dword 0 from pix0 (pixel 0), dword 2 from pix0 (pixel 1),
+            //         dword 0 from pix2 (pixel 2), dword 2 from pix2 (pixel 3).
+            pc->v_swizzle_u32x4(pix0, pix0, swizzle(2, 0, 2, 0)); // [p1, p0, p1, p0] -> keep low 64
+            pc->v_swizzle_u32x4(pix2, pix2, swizzle(2, 0, 2, 0)); // [p3, p2, p3, p2] -> keep low 64
+            pc->v_interleave_lo_u64(pix0, pix0, pix2);             // [p3, p2, p1, p0]
+
+            p.pc.init(pix0);
+            FetchUtils::satisfy_pixels(pc, p, flags);
+          }
           break;
         }
 
