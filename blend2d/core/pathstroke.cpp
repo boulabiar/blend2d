@@ -10,6 +10,7 @@
 #include <blend2d/geometry/bezier_p.h>
 #include <blend2d/support/lookuptable_p.h>
 #include <blend2d/support/math_p.h>
+#include <blend2d/simd/simd_p.h>
 
 namespace bl {
 namespace PathInternal {
@@ -888,8 +889,25 @@ SmoothPolyTo:
     BLPoint v0 = p1 - p0;
     BLPoint v1 = p2 - p1;
 
-    BLPoint m0 = Geometry::normal(Geometry::unit_vector(p0 != p1 ? v0 : v1));
-    BLPoint m2 = Geometry::normal(Geometry::unit_vector(p1 != p2 ? v1 : v0));
+    // Select non-degenerate vectors for unit normal computation.
+    BLPoint uv0 = (p0 != p1) ? v0 : v1;
+    BLPoint uv1 = (p1 != p2) ? v1 : v0;
+
+    // Compute both magnitude-squared values.
+    double ms0 = Geometry::magnitude_squared(uv0);
+    double ms1 = Geometry::magnitude_squared(uv1);
+
+    // Batch both sqrts into a single vsqrtpd / fsqrt. The compiler won't
+    // merge two independent Math::sqrt(double) calls on its own.
+    using namespace SIMD;
+    Vec2xF64 ms_pair = make128_f64(ms1, ms0);
+    Vec2xF64 mg_pair = sqrt(ms_pair);
+    double mg0 = cast_to_f64(mg_pair);
+    double mg1 = cast_to_f64(swizzle_f64<1, 1>(mg_pair));
+
+    // Unit normals: normal(v/|v|) = (-v.y/|v|, v.x/|v|).
+    BLPoint m0 = BLPoint(-uv0.y / mg0, uv0.x / mg0);
+    BLPoint m2 = BLPoint(-uv1.y / mg1, uv1.x / mg1);
 
     _p0 = p2;
     _n0 = m2;
