@@ -28,33 +28,34 @@ namespace bl::Jpeg {
 // back to u8.
 
 uint8_t* BL_CDECL upsample_1x2_avx2(uint8_t* dst, uint8_t* src0, uint8_t* src1, uint32_t w, uint32_t hs) noexcept {
+  using namespace SIMD;
   bl_unused(src1, hs);
 
-  const __m256i coeff = _mm256_set1_epi16(0x0103); // byte pairs: {3, 1}
-  const __m256i bias = _mm256_set1_epi16(2);
+  const Vec32xU8 coeff = vec_u8(make256_u16(uint16_t(0x0103))); // byte pairs: {3, 1}
+  const Vec16xU16 bias = make256_u16(uint16_t(2));
 
   uint32_t i = 0;
 
   // Main loop: 32 bytes per iteration.
   for (; i + 32 <= w; i += 32) {
-    __m256i s0 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(src0 + i));
-    __m256i s1 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(src1 + i));
+    Vec32xU8 s0 = loadu<Vec32xU8>(src0 + i);
+    Vec32xU8 s1 = loadu<Vec32xU8>(src1 + i);
 
     // Interleave bytes into (src0, src1) pairs within each 128-bit lane.
-    __m256i lo = _mm256_unpacklo_epi8(s0, s1);
-    __m256i hi = _mm256_unpackhi_epi8(s0, s1);
+    Vec32xU8 lo = interleave_lo_u8(s0, s1);
+    Vec32xU8 hi = interleave_hi_u8(s0, s1);
 
     // Fused u8*i8 multiply-add: result[k] = 3*s0[k] + 1*s1[k] as i16.
-    __m256i r_lo = _mm256_maddubs_epi16(lo, coeff);
-    __m256i r_hi = _mm256_maddubs_epi16(hi, coeff);
+    Vec16xU16 r_lo = vec_u16(maddws_u8xi8_i16(lo, coeff));
+    Vec16xU16 r_hi = vec_u16(maddws_u8xi8_i16(hi, coeff));
 
     // Add rounding bias and shift right by 2.
-    r_lo = _mm256_srli_epi16(_mm256_add_epi16(r_lo, bias), 2);
-    r_hi = _mm256_srli_epi16(_mm256_add_epi16(r_hi, bias), 2);
+    r_lo = srli_u16<2>(add_i16(r_lo, bias));
+    r_hi = srli_u16<2>(add_i16(r_hi, bias));
 
     // Pack back to u8 with unsigned saturation. packus operates within
     // 128-bit lanes, matching the lane layout from unpacklo/hi above.
-    _mm256_storeu_si256(reinterpret_cast<__m256i*>(dst + i), _mm256_packus_epi16(r_lo, r_hi));
+    storeu(dst + i, vec_u8(packs_128_i16_u8(vec_i16(r_lo), vec_i16(r_hi))));
   }
 
   // Scalar tail.
@@ -76,6 +77,7 @@ uint8_t* BL_CDECL upsample_1x2_avx2(uint8_t* dst, uint8_t* src0, uint8_t* src1, 
 // then interleaves and packs to produce 32 output bytes per iteration.
 
 uint8_t* BL_CDECL upsample_2x1_avx2(uint8_t* dst, uint8_t* src0, uint8_t* src1, uint32_t w, uint32_t hs) noexcept {
+  using namespace SIMD;
   bl_unused(hs, src1);
 
   if (w == 1) {
@@ -83,37 +85,37 @@ uint8_t* BL_CDECL upsample_2x1_avx2(uint8_t* dst, uint8_t* src0, uint8_t* src1, 
     return dst;
   }
 
-  const __m256i bias = _mm256_set1_epi16(2);
+  const Vec16xU16 bias = make256_u16(uint16_t(2));
 
   // Handle first pixel (no left neighbor: left = self).
   dst[0] = src0[0];
   dst[1] = uint8_t((src0[0] * 3 + src0[1] + 2) >> 2);
 
-  // Main loop: process 16 input bytes → 32 output bytes per iteration.
-  // Loop range: i ∈ [1, w-1) for the interior pixels.
+  // Main loop: process 16 input bytes -> 32 output bytes per iteration.
+  // Loop range: i in [1, w-1) for the interior pixels.
   uint32_t i = 1;
   for (; i + 16 <= w - 1; i += 16) {
     // Three overlapping loads provide center, left (-1), and right (+1) neighbors.
-    __m256i c = _mm256_cvtepu8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i*>(src0 + i)));
-    __m256i l = _mm256_cvtepu8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i*>(src0 + i - 1)));
-    __m256i r = _mm256_cvtepu8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i*>(src0 + i + 1)));
+    Vec16xU16 c = loadu_128_u8_u16<Vec16xU16>(src0 + i);
+    Vec16xU16 l = loadu_128_u8_u16<Vec16xU16>(src0 + i - 1);
+    Vec16xU16 r = loadu_128_u8_u16<Vec16xU16>(src0 + i + 1);
 
     // 3 * center = (center << 1) + center.
-    __m256i c3 = _mm256_add_epi16(_mm256_slli_epi16(c, 1), c);
+    Vec16xU16 c3 = add_i16(slli_u16<1>(c), c);
 
     // even = (3*center + left + 2) >> 2
-    __m256i even = _mm256_srli_epi16(_mm256_add_epi16(_mm256_add_epi16(c3, l), bias), 2);
+    Vec16xU16 even = srli_u16<2>(add_i16(add_i16(c3, l), bias));
     // odd  = (3*center + right + 2) >> 2
-    __m256i odd = _mm256_srli_epi16(_mm256_add_epi16(_mm256_add_epi16(c3, r), bias), 2);
+    Vec16xU16 odd = srli_u16<2>(add_i16(add_i16(c3, r), bias));
 
     // Interleave (even, odd) as u16 pairs, then pack to u8.
     // unpacklo/hi operate within 128-bit lanes; packus does the same.
     // This produces the correct output order: [E0,O0, E1,O1, ...].
-    __m256i pairs_lo = _mm256_unpacklo_epi16(even, odd);
-    __m256i pairs_hi = _mm256_unpackhi_epi16(even, odd);
-    __m256i result = _mm256_packus_epi16(pairs_lo, pairs_hi);
+    Vec16xU16 pairs_lo = vec_u16(interleave_lo_u16(even, odd));
+    Vec16xU16 pairs_hi = vec_u16(interleave_hi_u16(even, odd));
+    Vec32xU8 result = vec_u8(packs_128_i16_u8(vec_i16(pairs_lo), vec_i16(pairs_hi)));
 
-    _mm256_storeu_si256(reinterpret_cast<__m256i*>(dst + i * 2), result);
+    storeu(dst + i * 2, result);
   }
 
   // Scalar tail for remaining interior pixels.
@@ -143,6 +145,7 @@ uint8_t* BL_CDECL upsample_2x1_avx2(uint8_t* dst, uint8_t* src0, uint8_t* src1, 
 // stays in u16 (max intermediate: 3*1020 + 1020 + 8 = 4088, well within u16).
 
 uint8_t* BL_CDECL upsample_2x2_avx2(uint8_t* dst, uint8_t* src0, uint8_t* src1, uint32_t w, uint32_t hs) noexcept {
+  using namespace SIMD;
   bl_unused(hs);
 
   if (w == 1) {
@@ -150,41 +153,41 @@ uint8_t* BL_CDECL upsample_2x2_avx2(uint8_t* dst, uint8_t* src0, uint8_t* src1, 
     return dst;
   }
 
-  const __m256i bias = _mm256_set1_epi16(8);
+  const Vec16xU16 bias = make256_u16(uint16_t(8));
 
   // Handle first output pixel. t1 = 3*src0[0] + src1[0].
   uint32_t t1_scalar = 3 * src0[0] + src1[0];
   dst[0] = uint8_t((t1_scalar + 2) >> 2);
 
-  // Main loop: process 16 input positions → 32 output bytes per iteration.
-  // Loop range: i ∈ [1, w) for interior + last position.
+  // Main loop: process 16 input positions -> 32 output bytes per iteration.
+  // Loop range: i in [1, w) for interior + last position.
   uint32_t i = 1;
   for (; i + 16 <= w; i += 16) {
     // Load and widen src0/src1 at current and previous positions.
-    __m256i s0c = _mm256_cvtepu8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i*>(src0 + i)));
-    __m256i s1c = _mm256_cvtepu8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i*>(src1 + i)));
-    __m256i s0p = _mm256_cvtepu8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i*>(src0 + i - 1)));
-    __m256i s1p = _mm256_cvtepu8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i*>(src1 + i - 1)));
+    Vec16xU16 s0c = loadu_128_u8_u16<Vec16xU16>(src0 + i);
+    Vec16xU16 s1c = loadu_128_u8_u16<Vec16xU16>(src1 + i);
+    Vec16xU16 s0p = loadu_128_u8_u16<Vec16xU16>(src0 + i - 1);
+    Vec16xU16 s1p = loadu_128_u8_u16<Vec16xU16>(src1 + i - 1);
 
     // Vertical blend: t = 3*s0 + s1.
-    __m256i t_cur = _mm256_add_epi16(_mm256_add_epi16(_mm256_slli_epi16(s0c, 1), s0c), s1c);
-    __m256i t_prev = _mm256_add_epi16(_mm256_add_epi16(_mm256_slli_epi16(s0p, 1), s0p), s1p);
+    Vec16xU16 t_cur = add_i16(add_i16(slli_u16<1>(s0c), s0c), s1c);
+    Vec16xU16 t_prev = add_i16(add_i16(slli_u16<1>(s0p), s0p), s1p);
 
     // Horizontal blend: 3*t + t_neighbor.
-    __m256i t_cur3 = _mm256_add_epi16(_mm256_slli_epi16(t_cur, 1), t_cur);
-    __m256i t_prev3 = _mm256_add_epi16(_mm256_slli_epi16(t_prev, 1), t_prev);
+    Vec16xU16 t_cur3 = add_i16(slli_u16<1>(t_cur), t_cur);
+    Vec16xU16 t_prev3 = add_i16(slli_u16<1>(t_prev), t_prev);
 
     // dst[i*2-1] = (3*t_prev + t_cur + 8) >> 4
-    __m256i val_odd = _mm256_srli_epi16(_mm256_add_epi16(_mm256_add_epi16(t_prev3, t_cur), bias), 4);
+    Vec16xU16 val_odd = srli_u16<4>(add_i16(add_i16(t_prev3, t_cur), bias));
     // dst[i*2]   = (3*t_cur + t_prev + 8) >> 4
-    __m256i val_even = _mm256_srli_epi16(_mm256_add_epi16(_mm256_add_epi16(t_cur3, t_prev), bias), 4);
+    Vec16xU16 val_even = srli_u16<4>(add_i16(add_i16(t_cur3, t_prev), bias));
 
     // Interleave (odd, even) — odd goes to dst[i*2-1], even to dst[i*2].
-    __m256i pairs_lo = _mm256_unpacklo_epi16(val_odd, val_even);
-    __m256i pairs_hi = _mm256_unpackhi_epi16(val_odd, val_even);
-    __m256i result = _mm256_packus_epi16(pairs_lo, pairs_hi);
+    Vec16xU16 pairs_lo = vec_u16(interleave_lo_u16(val_odd, val_even));
+    Vec16xU16 pairs_hi = vec_u16(interleave_hi_u16(val_odd, val_even));
+    Vec32xU8 result = vec_u8(packs_128_i16_u8(vec_i16(pairs_lo), vec_i16(pairs_hi)));
 
-    _mm256_storeu_si256(reinterpret_cast<__m256i*>(dst + i * 2 - 1), result);
+    storeu(dst + i * 2 - 1, result);
   }
 
   // Scalar tail.
