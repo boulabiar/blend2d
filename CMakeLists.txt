@@ -353,6 +353,9 @@ set(BLEND2D_SRC_LIST
   blend2d/pixelops/interpolation_sse2.cpp
   blend2d/pixelops/funcs.cpp
   blend2d/pixelops/funcs_p.h
+  blend2d/pixelops/gradientfill.cpp
+  blend2d/pixelops/gradientfill_avx2.cpp
+  blend2d/pixelops/gradientfill_p.h
   blend2d/pixelops/scalar_test.cpp
   blend2d/pixelops/scalar_p.h
 

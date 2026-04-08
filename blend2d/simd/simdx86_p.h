@@ -1507,6 +1507,9 @@ template<uint8_t B, uint8_t A>
 BL_INLINE_NODEBUG __m256i simd_permute_u128(const __m256i& a, const __m256i& b) noexcept { return _mm256_permute2x128_si256(a, b, ((B & 0xF) << 4) + (A & 0xF)); }
 template<uint8_t B, uint8_t A>
 BL_INLINE_NODEBUG __m256i simd_permute_u128(const __m256i& a) noexcept { return simd_permute_u128<B, A>(a, a); }
+
+// Variable permute: select any of 8 dwords from `a` using indices in `idx` (vpermd).
+BL_INLINE_NODEBUG __m256i simd_permute_u32_var(const __m256i& a, const __m256i& idx) noexcept { return _mm256_permutevar8x32_epi32(a, idx); }
 #endif // BL_TARGET_OPT_AVX2
 
 #if defined(BL_TARGET_OPT_AVX2)
@@ -4901,6 +4904,9 @@ template<uint8_t B, uint8_t A, typename V>
 BL_INLINE_NODEBUG V permute_i128(const V& a) noexcept { return from_simd<V>(I::simd_permute_u128<B, A>(simd_cast<__m256i>(a.v))); }
 template<uint8_t B, uint8_t A, typename V>
 BL_INLINE_NODEBUG V permute_i128(const V& a, const V& b) noexcept { return from_simd<V>(I::simd_permute_u128<B, A>(simd_cast<__m256i>(a.v), simd_cast<__m256i>(b.v))); }
+
+template<typename V>
+BL_INLINE_NODEBUG V permute_u32_var(const V& a, const V& idx) noexcept { return V{I::simd_permute_u32_var(simd_as_i(a.v), simd_as_i(idx.v))}; }
 
 template<typename V>
 BL_INLINE_NODEBUG V interleave_i128(const V& a, const V& b) noexcept { return from_simd<V>(I::simd_interleave_u128(simd_cast<__m128i>(a.v), simd_cast<__m128i>(b.v))); }
