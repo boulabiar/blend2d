@@ -7,6 +7,7 @@
 #define BLEND2D_PIXELOPS_FUNCS_P_H_INCLUDED
 
 #include <blend2d/core/api-internal_p.h>
+#include <blend2d/pipeline/pipedefs_p.h>
 
 //! \cond INTERNAL
 //! \addtogroup blend2d_internal
@@ -17,6 +18,13 @@ namespace bl::PixelOps {
 struct Funcs {
   void (BL_CDECL* interpolate_prgb32)(uint32_t* dst, uint32_t dst_size, const BLGradientStop* stops, size_t stop_count) noexcept;
   void (BL_CDECL* interpolate_prgb64)(uint64_t* dst, uint32_t dst_size, const BLGradientStop* stops, size_t stop_count) noexcept;
+
+  //! Fill a rectangular region with a linear gradient (pad extend, PRGB32).
+  //! Uses the precomputed LUT from `gradient->lut.data`.
+  void (BL_CDECL* fill_linear_pad_prgb32)(
+      uint8_t* dst_data, intptr_t dst_stride,
+      uint32_t x0, uint32_t y0, uint32_t w, uint32_t h,
+      const Pipeline::FetchData::Gradient* gradient) noexcept;
 };
 
 extern Funcs funcs;
