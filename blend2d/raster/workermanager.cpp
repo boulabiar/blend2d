@@ -120,6 +120,7 @@ BLResult WorkerManager::init(BLRasterContextImpl* ctx_impl, const BLContextCreat
     _thread_count = 0;
   }
 
+  _probe_async_path_limit = 10;
   _probe_band_first = 0;
   _probe_band_last = UINT32_MAX;
   _is_active = true;

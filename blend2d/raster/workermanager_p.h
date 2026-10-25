@@ -183,6 +183,7 @@ public:
   uint32_t _thread_count;
   //! Number of bands,
   uint32_t _band_count;
+  uint32_t _probe_async_path_limit = 10;
   uint32_t _probe_band_first = 0;
   uint32_t _probe_band_last = UINT32_MAX;
   //! Batch id, an incrementing number that is assigned to FetchData.
