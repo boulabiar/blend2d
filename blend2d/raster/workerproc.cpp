@@ -275,14 +275,14 @@ static void process_commands(WorkData* work_data, RenderBatch* batch) noexcept {
   }
 
   uint32_t worker_count = batch->worker_count();
-  uint32_t band_count = batch->band_count();
+  uint32_t band_count = bl_min(batch->band_count(), batch->_probe_band_last);
 
   // We can process several consecutive bands at once when there is enough of bands for all the threads.
   //
   // TODO: [Rendering Context] At the moment this feature is not used as it regressed bl_bench using 4+ threads.
   uint32_t consecutive_band_count = 1;
 
-  uint32_t band_id = work_data->worker_id() * consecutive_band_count;
+  uint32_t band_id = batch->_probe_band_first + work_data->worker_id() * consecutive_band_count;
   uint32_t consecutive_index = 0;
 
   uint32_t current_band_id = band_id + consecutive_index;

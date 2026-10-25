@@ -183,6 +183,8 @@ public:
   uint32_t _thread_count;
   //! Number of bands,
   uint32_t _band_count;
+  uint32_t _probe_band_first = 0;
+  uint32_t _probe_band_last = UINT32_MAX;
   //! Batch id, an incrementing number that is assigned to FetchData.
   uint32_t _batch_id;
   //! Number of commands in the queue.
@@ -421,6 +423,8 @@ public:
     _current_batch->_command_count += uint32_t(last_command_queue->size());
     _current_batch->_state_slot_count = _state_slot_count;
     _current_batch->_band_count = _band_count;
+    _current_batch->_probe_band_first = _probe_band_first;
+    _current_batch->_probe_band_last = _probe_band_last;
     // TODO: [Rendering Context] Not used. the idea is that after the batch is processed we can reuse the blocks of the allocator (basically move it after the current block).
     // _current_batch->_past_block = _allocator.past_block();
 

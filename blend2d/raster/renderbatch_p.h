@@ -49,6 +49,8 @@ public:
   uint32_t _job_count;
   uint32_t _command_count;
   uint32_t _band_count;
+  uint32_t _probe_band_first;
+  uint32_t _probe_band_last;
   uint32_t _state_slot_count;
   uint32_t _has_split_fill;
 

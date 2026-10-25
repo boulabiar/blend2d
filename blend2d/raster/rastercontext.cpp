@@ -4716,3 +4716,17 @@ void bl_raster_context_on_init(BLRuntimeContext* rt) noexcept {
   bl::RasterEngine::init_virt<bl::RasterEngine::RenderingMode::kSync>(&bl::RasterEngine::raster_impl_virt_sync);
   bl::RasterEngine::init_virt<bl::RasterEngine::RenderingMode::kAsync>(&bl::RasterEngine::raster_impl_virt_async);
 }
+
+// Experimental benchmark hook: restrict raster writes, not geometry preparation.
+// Call only on a newly created asynchronous raster context before any draws.
+extern "C" BLResult bl_probe_set_band_range(BLContextCore* self, uint32_t y0, uint32_t y1) noexcept {
+  auto* ctx = reinterpret_cast<BLRasterContextImpl*>(self->_d.impl);
+  auto& manager = ctx->worker_mgr();
+  uint32_t height = uint32_t(ctx->dst_data.size.h);
+  uint32_t band = ctx->band_height();
+  if (!manager.is_active() || y0 > y1 || y1 > height || y0 % band || (y1 != height && y1 % band))
+    return BL_ERROR_INVALID_VALUE;
+  manager._probe_band_first = y0 / band;
+  manager._probe_band_last = (y1 + band - 1) / band;
+  return BL_SUCCESS;
+}
