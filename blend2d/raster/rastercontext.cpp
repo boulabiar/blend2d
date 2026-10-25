@@ -2766,7 +2766,7 @@ BL_NOINLINE BLResult fill_clipped_edges<kAsync>(BLRasterContextImpl* ctx_impl, D
 
   di.add_fill_type(Pipeline::FillType::kAnalytic);
   command->init_command(di.alpha);
-  command->init_fill_analytic(edge_storage.flatten_edge_links(), edge_storage.bounding_box().y0, fill_rule);
+  command->init_fill_analytic(edge_storage.flatten_edge_links(), edge_storage.bounding_box().y0, fill_rule, edge_storage.bounding_box().y1);
   edge_storage.reset_bounding_box();
 
   BLResult result = ensure_fetch_and_dispatch_data(ctx_impl, di.signature, ds.fetch_data, command->pipe_dispatch_data());

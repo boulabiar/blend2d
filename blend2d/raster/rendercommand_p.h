@@ -124,6 +124,8 @@ struct RenderCommand {
     //! Index of state slot that is used by to keep track of the command progress. The index refers to a table where
     //! a command-specific state data is stored.
     uint32_t state_slot_index;
+    //! Conservative bottom Y bound, using the remaining bytes of the 32-byte payload.
+    int fixed_y1;
   };
 
   //! Command payload - each command type has a specific payload.
@@ -197,13 +199,14 @@ struct RenderCommand {
 
   //! Initializes FillAnalytic command.
   //!
-  //! \note `edges` may be null in case that this command requires a job to build the edges. In this case both `edges`
-  //! and `fixed_y0` members will be changed when such job completes.
-  BL_INLINE void init_fill_analytic(EdgeVector<int>* edges, int fixed_y0, BLFillRule fill_rule) noexcept {
+  //! \note `edges` may be null in case that this command requires a job to build the edges. In this case `edges`
+  //! and both Y bounds will be changed when such job completes.
+  BL_INLINE void init_fill_analytic(EdgeVector<int>* edges, int fixed_y0, BLFillRule fill_rule, int fixed_y1 = 0x7fffffff) noexcept {
     BL_ASSERT(fill_rule <= BL_FILL_RULE_MAX_VALUE);
 
     _payload.analytic.edges.ptr = edges;
     _payload.analytic.fixed_y0 = fixed_y0;
+    _payload.analytic.fixed_y1 = fixed_y1;
     _payload.analytic.fill_rule = uint32_t(fill_rule);
     _type = RenderCommandType::kFillAnalytic;
   }
@@ -219,6 +222,7 @@ struct RenderCommand {
   BL_INLINE void set_analytic_edges(EdgeStorage<int>* edge_storage) noexcept {
     _payload.analytic.edges.ptr = edge_storage->flatten_edge_links();
     _payload.analytic.fixed_y0 = edge_storage->bounding_box().y0;
+    _payload.analytic.fixed_y1 = edge_storage->bounding_box().y1;
   }
 
   BL_INLINE void mark_fetch_data() noexcept { add_flags(RenderCommandFlags::kHasStyleFetchData); }
