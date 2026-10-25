@@ -2449,7 +2449,7 @@ static BL_INLINE BLResult enqueue_command(
 // Split only at MOVE boundaries: partial edge generation preserves the fill's
 // contour closure, while all edges are combined before the single draw executes.
 static bool try_enqueue_split_fill(WorkerManager& mgr, RenderJob_GeometryOp* source) noexcept {
-  if (source->has_job_flag(RenderJobFlags::kCachedStroke | RenderJobFlags::kPackedStroke) || source->geometry_type() != BL_GEOMETRY_TYPE_PATH || mgr.thread_count() < 1)
+  if (source->has_job_flag(RenderJobFlags::kCachedStroke | RenderJobFlags::kPackedStroke | RenderJobFlags::kBorrowedPath) || source->geometry_type() != BL_GEOMETRY_TYPE_PATH || mgr.thread_count() < 1)
     return false;
   const BLPath* path = source->geometry_data<BLPath>();
   if (path->size() < 32768)
@@ -4769,4 +4769,36 @@ extern "C" BLResult bl_probe_set_async_path_limit(BLContextCore* self,uint32_t l
   auto* ctx=reinterpret_cast<BLRasterContextImpl*>(self->_d.impl);
   if(!ctx->worker_mgr().is_active())return BL_ERROR_INVALID_STATE;
   ctx->worker_mgr()._probe_async_path_limit=limit;return BL_SUCCESS;
+}
+
+namespace bl::RasterEngine {
+template<bool Stroke>
+static BLResult probe_geometry_borrowed(BLRasterContextImpl* ctx_impl,const BLPathCore* path,const BLObjectCore* style) noexcept {
+  constexpr RenderingMode kRM=kAsync;
+  constexpr bool kNoBail=false;
+  constexpr BLContextStyleSlot slot=Stroke?BL_CONTEXT_STYLE_SLOT_STROKE:BL_CONTEXT_STYLE_SLOT_FILL;
+  constexpr ContextFlags nop=Stroke?ContextFlags::kNoStrokeOpExplicit:ContextFlags::kNoFillOpExplicit;
+  BLResult bail_result=BL_SUCCESS;
+  BL_CONTEXT_RESOLVE_EXPLICIT_STYLE_OP(nop,slot,style,kNoBail);
+  di.add_fill_type(Pipeline::FillType::kAnalytic);
+  RenderCommand* command=ctx_impl->worker_mgr().current_command();command->init_command(di.alpha);
+  command->init_fill_analytic(nullptr,0,Stroke?BL_FILL_RULE_NON_ZERO:ctx_impl->fill_rule());
+  BLPoint origin(ctx_impl->final_transform_fixed().m20,ctx_impl->final_transform_fixed().m21);
+  auto initialize=[&](RenderJob_GeometryOp* job) noexcept {
+    job->_payload_type=uint8_t(BL_GEOMETRY_TYPE_PATH);
+    memcpy(job->geometry_data<BLPathCore>(),path,sizeof(BLPathCore));
+    job->add_job_flags(RenderJobFlags::kBorrowedPath);
+  };
+  BLResult result;
+  if constexpr(Stroke)result=enqueue_command_with_stroke_job<RenderJob_GeometryOp>(ctx_impl,di,ds,sizeof(RenderJob_GeometryOp)+sizeof(BLPathCore),origin,initialize);
+  else result=enqueue_command_with_fill_job<RenderJob_GeometryOp>(ctx_impl,di,ds,sizeof(RenderJob_GeometryOp)+sizeof(BLPathCore),origin,initialize);
+  return finalize_explicit_op<kAsync>(ctx_impl,fetch_data.ptr(),result);
+}
+}
+// Borrowed-path contract: immutable path and implementation live through flush.
+extern "C" BLResult bl_probe_geometry_borrowed(BLContextCore* self,const BLPathCore* path,uint32_t stroke,const void* style) noexcept {
+  auto* ctx=reinterpret_cast<BLRasterContextImpl*>(self->_d.impl);
+  if(!ctx->worker_mgr().is_active())return BL_ERROR_INVALID_STATE;
+  if(stroke)return bl::RasterEngine::probe_geometry_borrowed<true>(ctx,path,static_cast<const BLObjectCore*>(style));
+  return bl::RasterEngine::probe_geometry_borrowed<false>(ctx,path,static_cast<const BLObjectCore*>(style));
 }

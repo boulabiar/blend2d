@@ -106,7 +106,7 @@ static BL_INLINE BLPath* get_geometry_as_path(WorkData* work_data, RenderJob_Geo
 
 static BL_INLINE void finalize_geometry_data(WorkData* work_data, RenderJob_GeometryOp* job) noexcept {
   bl_unused(work_data);
-  if (job->geometry_type() == BL_GEOMETRY_TYPE_PATH)
+  if (job->geometry_type() == BL_GEOMETRY_TYPE_PATH && !job->has_job_flag(RenderJobFlags::kBorrowedPath))
     job->geometry_data<BLPath>()->~BLPath();
 }
 
