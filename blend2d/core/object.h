@@ -504,7 +504,7 @@ struct BLObjectInfo {
 
   //! Tests whether BLObjectInfo describes a valid BLObject of the given `type`.
   BL_INLINE_CONSTEXPR bool check_object_signature_and_raw_type(BLObjectType type) const noexcept {
-    return has_object_signature_and_flags(uint32_t(type) << BL_OBJECT_INFO_TYPE_SHIFT);
+    return has_object_signature_and_flags(BL_OBJECT_INFO_TYPE_MASK, uint32_t(type) << BL_OBJECT_INFO_TYPE_SHIFT);
   }
 
   //! \}

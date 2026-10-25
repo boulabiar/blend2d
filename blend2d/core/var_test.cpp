@@ -7,8 +7,10 @@
 #include <blend2d/core/api-build_test_p.h>
 #if defined(BL_TEST)
 
+#include <blend2d/core/array_p.h>
 #include <blend2d/core/gradient_p.h>
 #include <blend2d/core/object_p.h>
+#include <blend2d/core/path_p.h>
 #include <blend2d/core/pattern_p.h>
 #include <blend2d/core/rgba_p.h>
 #include <blend2d/core/string_p.h>
@@ -19,6 +21,38 @@
 
 namespace bl {
 namespace Tests {
+
+UNIT(var_exact_type_predicates, BL_TEST_GROUP_CORE_OBJECT) {
+  // Types with overlapping set bits must still be distinct. In particular,
+  // a gradient (raw type 5) must not pass the RGBA32 (raw type 1) predicate.
+  BLImage image(2, 2, BL_FORMAT_PRGB32);
+  BLPattern pattern(image);
+  BLGradient gradient(BLLinearGradientValues(0, 0, 1, 1));
+  BLPath path;
+  BLArray<uint32_t> array;
+  BLString string("test");
+  const BLVar values[] = {
+    BLVar(), BLVar(BLRgba32(0xFF112233u)), BLVar(BLRgba64(0xFFFF111122223333ull)),
+    BLVar(BLRgba(0.1, 0.2, 0.3, 1)), BLVar(gradient), BLVar(pattern), BLVar(image),
+    BLVar(path), BLVar(array), BLVar(string), BLVar(true),
+    BLVar(int64_t(-123)), BLVar(uint64_t(456)), BLVar(0.5)
+  };
+
+  for (const BLVar& value : values) {
+    EXPECT_EQ(value.is_rgba32(), value.type() == BL_OBJECT_TYPE_RGBA32);
+    EXPECT_EQ(value.is_rgba64(), value.type() == BL_OBJECT_TYPE_RGBA64);
+    EXPECT_EQ(value.is_gradient(), value.type() == BL_OBJECT_TYPE_GRADIENT);
+    EXPECT_EQ(value.is_pattern(), value.type() == BL_OBJECT_TYPE_PATTERN);
+    EXPECT_EQ(value.is_null(), value.type() == BL_OBJECT_TYPE_NULL);
+    EXPECT_EQ(value.is_image(), value.type() == BL_OBJECT_TYPE_IMAGE);
+    EXPECT_EQ(value.is_path(), value.type() == BL_OBJECT_TYPE_PATH);
+    EXPECT_EQ(value.is_string(), value.type() == BL_OBJECT_TYPE_STRING);
+    EXPECT_EQ(value.is_bool(), value.type() == BL_OBJECT_TYPE_BOOL);
+    EXPECT_EQ(value.is_int64(), value.type() == BL_OBJECT_TYPE_INT64);
+    EXPECT_EQ(value.is_uint64(), value.type() == BL_OBJECT_TYPE_UINT64);
+    EXPECT_EQ(value.is_double(), value.type() == BL_OBJECT_TYPE_DOUBLE);
+  }
+}
 
 UNIT(var_basic_types, BL_TEST_GROUP_CORE_OBJECT) {
   INFO("Verifying null value functionality");
