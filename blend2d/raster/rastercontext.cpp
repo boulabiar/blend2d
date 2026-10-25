@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: Zlib
 
 #include <blend2d/core/api-build_p.h>
+#include <new>
 #include <blend2d/core/compopinfo_p.h>
 #include <blend2d/core/font_p.h>
 #include <blend2d/core/format_p.h>
@@ -1018,10 +1019,87 @@ static BL_INLINE void release_batch_fetch_data(BLRasterContextImpl* ctx_impl, Re
   }
 }
 
+struct ProbeRecordedBatch {
+  ArenaAllocator arena{131072,64};
+  RenderBatch* batch=nullptr;
+  ProbeRecordedBatch* next=nullptr;
+};
+struct ProbeRecordedFrame {
+  ProbeRecordedBatch* first=nullptr;
+  ProbeRecordedBatch* last=nullptr;
+  bool capturing=true;
+};
+template<typename Func>
+static void probe_each_record_job(RenderBatch* batch, const Func& fn) noexcept {
+  for(auto* queue=batch->_job_list.first();queue;queue=queue->next()) {
+    for(size_t i=0;i<queue->size();i++)fn(queue->at(i));
+    if(queue==batch->_job_list.last())break;
+  }
+}
+void probe_record_dispose(BLRasterContextImpl* ctx) noexcept {
+  auto& mgr=ctx->worker_mgr();auto* frame=static_cast<ProbeRecordedFrame*>(mgr._probe_record);
+  mgr._probe_record=nullptr;if(!frame)return;
+  for(auto* node=frame->first;node;){
+    auto* next=node->next;
+    release_batch_fetch_data(ctx,node->batch->_command_list.first());
+    probe_each_record_job(node->batch,[](RenderJob* base) noexcept {
+      if(base->has_job_flag(RenderJobFlags::kRecordedOwner))
+        static_cast<RenderJob_GeometryOp*>(base)->geometry_data<BLPath>()->~BLPath();
+    });
+    delete node;node=next;
+  }
+  delete frame;
+}
+static void probe_reset_record_batch(RenderBatch* batch) noexcept {
+  batch->_job_index=0;batch->_accumulated_error_flags=0;
+  probe_each_record_job(batch,[](RenderJob* base) noexcept {
+    if(base->has_job_flag(RenderJobFlags::kSplitFill)) {
+      auto* job=static_cast<RenderJob_GeometryOp*>(base);auto* ref=job->split_fill_ref();
+      if(ref->index==0){
+        auto* group=ref->group;group->remaining=group->part_count;
+        memset(group->bands,0,size_t(group->part_count)*group->band_count*sizeof(EdgeList<int>));
+        for(uint32_t i=0;i<group->part_count;i++)group->parts[i].bounds.reset(INT_MAX,INT_MAX,INT_MIN,INT_MIN);
+        job->command()._payload.analytic.edges.ptr=nullptr;
+      }
+    }
+  });
+}
+static void probe_run_record_batch(BLRasterContextImpl* ctx,RenderBatch* batch) noexcept {
+  auto& mgr=ctx->worker_mgr();auto* synchronization=&mgr._synchronization;uint32_t count=mgr.thread_count();
+  probe_reset_record_batch(batch);
+  for(uint32_t i=0;i<count;i++){auto* data=mgr._work_data_storage[i];data->init_batch(batch);data->init_context_data(ctx->dst_data,ctx->sync_work_data.ctx_data.pixel_origin);}
+  synchronization->before_start(count,batch->job_count()>0);
+  for(uint32_t i=0;i<count;i++)mgr._worker_threads[i]->run(WorkerProc::worker_thread_entry,mgr._work_data_storage[i]);
+  synchronization->thread_started();
+  {SyncWorkState state;state.save(ctx->sync_work_data);WorkerProc::process_work_data(&ctx->sync_work_data,batch);state.restore(ctx->sync_work_data);}
+  if(count){synchronization->wait_for_threads_to_finish();ctx->sync_work_data._accumulated_error_flags|=bl_atomic_fetch_relaxed(&batch->_accumulated_error_flags);}
+  ctx->sync_work_data.start_over();
+}
+
 static BL_NOINLINE BLResult flush_render_batch(BLRasterContextImpl* ctx_impl) noexcept {
   WorkerManager& mgr = ctx_impl->worker_mgr();
   if (mgr.has_pending_commands()) {
+    auto* frame=static_cast<ProbeRecordedFrame*>(mgr._probe_record);
+    ProbeRecordedBatch* recording=nullptr;
+    if(frame && frame->capturing){
+      recording=new(std::nothrow) ProbeRecordedBatch();
+      if(!recording)return BL_ERROR_OUT_OF_MEMORY;
+      BLResult allocation=recording->arena.ensure(sizeof(RenderBatch)+RenderJobQueue::size_of()+RenderCommandQueue::size_of());
+      if(allocation){delete recording;return allocation;}
+      auto* last=mgr.current_batch()->_job_list.last();
+      for(auto* q=mgr.current_batch()->_job_list.first();q;q=q->next()){
+        size_t n=q==last?mgr._job_appender.index(*q):q->size();
+        for(size_t i=0;i<n;i++){auto* job=q->data()[i];if(job->job_type()!=RenderJobType::kFillGeometry && job->job_type()!=RenderJobType::kStrokeGeometry){delete recording;return BL_ERROR_NOT_IMPLEMENTED;}}
+        if(q==last)break;
+      }
+    }
     mgr.finalize_batch();
+    if(recording){
+      probe_each_record_job(mgr.current_batch(),[](RenderJob* job) noexcept {
+        if(!job->has_job_flag(RenderJobFlags::kBorrowedPath))job->add_job_flags(RenderJobFlags::kRecordedOwner);
+        job->add_job_flags(RenderJobFlags::kBorrowedPath|RenderJobFlags::kRecordedJob);
+      });
+    }
 
     WorkerSynchronization* synchronization = &mgr._synchronization;
     RenderBatch* batch = mgr.current_batch();
@@ -1057,9 +1135,13 @@ static BL_NOINLINE BLResult flush_render_batch(BLRasterContextImpl* ctx_impl) no
       ctx_impl->sync_work_data._accumulated_error_flags |= bl_atomic_fetch_relaxed(&batch->_accumulated_error_flags);
     }
 
-    release_batch_fetch_data(ctx_impl, batch->_command_list.first());
-
-    mgr._allocator.clear();
+    if(recording){
+      recording->batch=batch;mgr._allocator.swap(recording->arena);
+      if(frame->last)frame->last->next=recording;else frame->first=recording;frame->last=recording;
+    } else {
+      release_batch_fetch_data(ctx_impl, batch->_command_list.first());
+      mgr._allocator.clear();
+    }
     mgr.init_first_batch();
 
     ctx_impl->sync_work_data.start_over();
@@ -4801,4 +4883,27 @@ extern "C" BLResult bl_probe_geometry_borrowed(BLContextCore* self,const BLPathC
   if(!ctx->worker_mgr().is_active())return BL_ERROR_INVALID_STATE;
   if(stroke)return bl::RasterEngine::probe_geometry_borrowed<true>(ctx,path,static_cast<const BLObjectCore*>(style));
   return bl::RasterEngine::probe_geometry_borrowed<false>(ctx,path,static_cast<const BLObjectCore*>(style));
+}
+
+extern "C" BLResult bl_probe_record_begin(BLContextCore* self) noexcept {
+  auto* ctx=reinterpret_cast<BLRasterContextImpl*>(self->_d.impl);auto& mgr=ctx->worker_mgr();
+  if(!mgr.is_active() || mgr._probe_record || mgr.has_pending_commands())return BL_ERROR_INVALID_STATE;
+  auto* frame=new(std::nothrow) bl::RasterEngine::ProbeRecordedFrame();if(!frame)return BL_ERROR_OUT_OF_MEMORY;
+  mgr._probe_record=frame;mgr._probe_async_path_limit=0;return BL_SUCCESS;
+}
+extern "C" BLResult bl_probe_record_end(BLContextCore* self) noexcept {
+  auto* ctx=reinterpret_cast<BLRasterContextImpl*>(self->_d.impl);auto& mgr=ctx->worker_mgr();
+  auto* frame=static_cast<bl::RasterEngine::ProbeRecordedFrame*>(mgr._probe_record);
+  if(!frame || !frame->capturing || mgr.has_pending_commands())return BL_ERROR_INVALID_STATE;
+  frame->capturing=false;size_t batches=0,commands=0,jobs=0,bytes=0;
+  for(auto* node=frame->first;node;node=node->next){batches++;commands+=node->batch->command_count();jobs+=node->batch->job_count();auto* block=node->arena._block;while(block->prev)block=block->prev;for(;block;block=block->next)bytes+=block->size;}
+  fprintf(stderr,"TAPE_PLAN batches=%zu commands=%zu jobs=%zu arena_bytes=%zu\n",batches,commands,jobs,bytes);
+  return BL_SUCCESS;
+}
+extern "C" BLResult bl_probe_record_replay(BLContextCore* self) noexcept {
+  auto* ctx=reinterpret_cast<BLRasterContextImpl*>(self->_d.impl);auto& mgr=ctx->worker_mgr();
+  auto* frame=static_cast<bl::RasterEngine::ProbeRecordedFrame*>(mgr._probe_record);
+  if(!frame || frame->capturing || mgr.has_pending_commands())return BL_ERROR_INVALID_STATE;
+  for(auto* node=frame->first;node;node=node->next)bl::RasterEngine::probe_run_record_batch(ctx,node->batch);
+  return BL_SUCCESS;
 }

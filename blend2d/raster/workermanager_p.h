@@ -31,6 +31,7 @@
 //! \{
 
 namespace bl::RasterEngine {
+BL_HIDDEN void probe_record_dispose(BLRasterContextImpl*) noexcept;
 
 template<typename T>
 struct PreallocatedStructPool {
@@ -183,6 +184,8 @@ public:
   uint32_t _thread_count;
   //! Number of bands,
   uint32_t _band_count;
+  void* _probe_record = nullptr;
+  BLRasterContextImpl* _probe_ctx = nullptr;
   uint32_t _probe_async_path_limit = 10;
   uint32_t _probe_band_first = 0;
   uint32_t _probe_band_last = UINT32_MAX;

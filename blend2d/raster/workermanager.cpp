@@ -120,6 +120,7 @@ BLResult WorkerManager::init(BLRasterContextImpl* ctx_impl, const BLContextCreat
     _thread_count = 0;
   }
 
+  _probe_ctx = ctx_impl;
   _probe_async_path_limit = 10;
   _probe_band_first = 0;
   _probe_band_last = UINT32_MAX;
@@ -146,6 +147,7 @@ void WorkerManager::reset() noexcept {
   if (!is_active())
     return;
 
+  if (_probe_record) probe_record_dispose(_probe_ctx);
   _is_active = false;
 
   if (_thread_pool) {

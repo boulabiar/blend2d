@@ -41,7 +41,9 @@ enum class RenderJobFlags : uint8_t {
   kSplitFill = 0x02u,
   kCachedStroke = 0x04u,
   kPackedStroke = 0x08u,
-  kBorrowedPath = 0x10u
+  kBorrowedPath = 0x10u,
+  kRecordedOwner = 0x20u,
+  kRecordedJob = 0x40u
 };
 BL_DEFINE_ENUM_FLAGS(RenderJobFlags)
 

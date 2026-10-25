@@ -335,6 +335,8 @@ static void process_stroke_text_job(WorkData* work_data, RenderJob_TextOp* job) 
 // ===========================================
 
 static void process_job(WorkData* work_data, RenderJob* job) noexcept {
+  if (job->has_job_flag(RenderJobFlags::kRecordedJob) && !job->has_job_flag(RenderJobFlags::kSplitFill))
+    job->command()._payload.analytic.edges.ptr = nullptr;
   if (job->has_job_flag(RenderJobFlags::kComputePendingFetchData)) {
     RenderCommand& command = job->command();
     compute_pending_fetch_data(command._source.fetch_data);
