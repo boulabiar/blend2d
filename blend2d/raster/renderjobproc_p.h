@@ -168,6 +168,41 @@ static void finish_split_fill(WorkData* work_data, RenderJob_GeometryOp* job, BL
 // bl::RasterEngine - Job Processor - Fill Geometry Job
 // ====================================================
 
+static BLResult add_cached_stroke_edges(WorkData* work_data, const JobStateAccessor& accessor, RenderJob_GeometryOp* job) noexcept {
+  auto* view=job->cached_stroke_view();
+  auto& builder=work_data->edge_builder;
+  BLMatrix2D transform=accessor.final_transform_fixed(job->origin_fixed());
+  BLTransformType type=accessor.final_transform_fixed_type();
+  builder.begin();
+  BLResult result=BL_SUCCESS;
+  for(size_t i=0;i<view->count;i++) {
+    const ProbeStrokePart& part=view->parts[i];
+    result=builder.add_path(part.a->dcast().view(),false,transform,type);if(result)break;
+    result=builder.add_reverse_path_from_stroke_sink(part.b->dcast().view(),transform,type);if(result)break;
+    if(!part.c->dcast().is_empty()){result=builder.add_path(part.c->dcast().view(),false,transform,type);if(result)break;}
+  }
+  if(result==BL_SUCCESS)result=builder.done();
+  if(result!=BL_SUCCESS){work_data->revert_edge_builder();return work_data->accumulate_error(result);}
+  return BL_SUCCESS;
+}
+
+static BLResult add_packed_stroke_edges(WorkData* work_data,const JobStateAccessor& accessor,RenderJob_GeometryOp* job) noexcept {
+  auto* ref=job->packed_stroke_ref();auto* view=ref->view;auto& builder=work_data->edge_builder;
+  BLMatrix2D transform=accessor.final_transform_fixed(job->origin_fixed());
+  BLTransformType type=accessor.final_transform_fixed_type();
+  auto path=[&](const ProbePackedSpan& span) noexcept {return BLPathView{view->commands+span.offset,view->vertices+span.offset,span.count};};
+  builder.begin();BLResult result=BL_SUCCESS;
+  for(uint32_t i=0;i<ref->count;i++) {
+    const auto& part=view->parts[size_t(ref->first)+i];
+    result=builder.add_path(path(part.a),false,transform,type);if(result)break;
+    result=builder.add_reverse_path_from_stroke_sink(path(part.b),transform,type);if(result)break;
+    if(part.c.count){result=builder.add_path(path(part.c),false,transform,type);if(result)break;}
+  }
+  if(result==BL_SUCCESS)result=builder.done();
+  if(result!=BL_SUCCESS){work_data->revert_edge_builder();return work_data->accumulate_error(result);}
+  return BL_SUCCESS;
+}
+
 static void process_fill_geometry_job(WorkData* work_data, RenderJob_GeometryOp* job) noexcept {
   BLPath* path = get_geometry_as_path(work_data, job);
   if (BL_UNLIKELY(!path))
@@ -183,7 +218,7 @@ static void process_fill_geometry_job(WorkData* work_data, RenderJob_GeometryOp*
     view.vertex_data += part.begin;
     view.size = part.end - part.begin;
   }
-  BLResult result = add_filled_path_edges(work_data, view, accessor.final_transform_fixed(job->origin_fixed()), accessor.final_transform_fixed_type());
+  BLResult result = job->has_job_flag(RenderJobFlags::kPackedStroke) ? add_packed_stroke_edges(work_data, accessor, job) : job->has_job_flag(RenderJobFlags::kCachedStroke) ? add_cached_stroke_edges(work_data, accessor, job) : add_filled_path_edges(work_data, view, accessor.final_transform_fixed(job->origin_fixed()), accessor.final_transform_fixed_type());
 
   if (job->has_job_flag(RenderJobFlags::kSplitFill)) {
     finish_split_fill(work_data, job, result);

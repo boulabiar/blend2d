@@ -2449,7 +2449,7 @@ static BL_INLINE BLResult enqueue_command(
 // Split only at MOVE boundaries: partial edge generation preserves the fill's
 // contour closure, while all edges are combined before the single draw executes.
 static bool try_enqueue_split_fill(WorkerManager& mgr, RenderJob_GeometryOp* source) noexcept {
-  if (source->geometry_type() != BL_GEOMETRY_TYPE_PATH || mgr.thread_count() < 1)
+  if (source->has_job_flag(RenderJobFlags::kCachedStroke | RenderJobFlags::kPackedStroke) || source->geometry_type() != BL_GEOMETRY_TYPE_PATH || mgr.thread_count() < 1)
     return false;
   const BLPath* path = source->geometry_data<BLPath>();
   if (path->size() < 32768)
@@ -4729,6 +4729,40 @@ extern "C" BLResult bl_probe_set_band_range(BLContextCore* self, uint32_t y0, ui
   manager._probe_band_first = y0 / band;
   manager._probe_band_last = (y1 + band - 1) / band;
   return BL_SUCCESS;
+}
+
+namespace bl::RasterEngine {
+static BLResult probe_stroke_cached_async(BLRasterContextImpl* ctx_impl, const BLPathCore* source, const void* view, const BLObjectCore* style, bool packed=false, uint32_t first=0, uint32_t count=0) noexcept {
+  constexpr RenderingMode kRM = kAsync;
+  constexpr bool kNoBail = false;
+  BLResult bail_result = BL_SUCCESS;
+  BL_CONTEXT_RESOLVE_EXPLICIT_STYLE_OP(ContextFlags::kNoStrokeOpExplicit, BL_CONTEXT_STYLE_SLOT_STROKE, style, kNoBail);
+  di.add_fill_type(Pipeline::FillType::kAnalytic);
+  RenderCommand* command = ctx_impl->worker_mgr().current_command();
+  command->init_command(di.alpha);
+  command->init_fill_analytic(nullptr, 0, BL_FILL_RULE_NON_ZERO);
+  BLPoint origin_fixed(ctx_impl->final_transform_fixed().m20, ctx_impl->final_transform_fixed().m21);
+  size_t job_size = sizeof(RenderJob_GeometryOp) + sizeof(BLPathCore) + (packed ? sizeof(ProbePackedRef) : sizeof(ProbeStrokeView*));
+  BLResult result = enqueue_command_with_fill_job<RenderJob_GeometryOp>(ctx_impl,di,ds,job_size,origin_fixed,[&](RenderJob_GeometryOp* job) noexcept {
+    BLPath empty;
+    job->set_geometry_with_path(source ? source : &empty);
+    if(packed){job->add_job_flags(RenderJobFlags::kPackedStroke);*job->packed_stroke_ref()={static_cast<const ProbePackedView*>(view),first,count};}
+    else{job->add_job_flags(RenderJobFlags::kCachedStroke);job->cached_stroke_view()=static_cast<const ProbeStrokeView*>(view);}
+  });
+  return finalize_explicit_op<kAsync>(ctx_impl, fetch_data.ptr(), result);
+}
+}
+// Benchmark-only borrowed immutable outline view; valid until the synchronous flush.
+extern "C" BLResult bl_probe_stroke_cached(BLContextCore* self,const BLPathCore* source,const void* view,const void* style) noexcept {
+  auto* ctx=reinterpret_cast<BLRasterContextImpl*>(self->_d.impl);
+  if(!ctx->worker_mgr().is_active())return BL_ERROR_INVALID_STATE;
+  return bl::RasterEngine::probe_stroke_cached_async(ctx,source,static_cast<const bl::RasterEngine::ProbeStrokeView*>(view),static_cast<const BLObjectCore*>(style));
+}
+
+extern "C" BLResult bl_probe_stroke_packed(BLContextCore* self,const BLPathCore* source,const void* view,uint32_t first,uint32_t count,const void* style) noexcept {
+  auto* ctx=reinterpret_cast<BLRasterContextImpl*>(self->_d.impl);
+  if(!ctx->worker_mgr().is_active())return BL_ERROR_INVALID_STATE;
+  return bl::RasterEngine::probe_stroke_cached_async(ctx,source,view,static_cast<const BLObjectCore*>(style),true,first,count);
 }
 
 extern "C" BLResult bl_probe_set_async_path_limit(BLContextCore* self,uint32_t limit) noexcept {

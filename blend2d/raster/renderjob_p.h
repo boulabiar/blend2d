@@ -38,7 +38,9 @@ enum class RenderJobFlags : uint8_t {
   kNoFlags = 0u,
 
   kComputePendingFetchData = 0x01u,
-  kSplitFill = 0x02u
+  kSplitFill = 0x02u,
+  kCachedStroke = 0x04u,
+  kPackedStroke = 0x08u
 };
 BL_DEFINE_ENUM_FLAGS(RenderJobFlags)
 
@@ -127,6 +129,14 @@ struct RenderJob_BaseOp : public RenderJob {
 
 // Split contours still produce one analytic fill command. Per-part edge lists
 // remain in worker arenas until the batch finishes; only the last producer merges.
+struct ProbePackedSpan {uint32_t offset,count;};
+struct ProbePackedPart {ProbePackedSpan a,b,c;};
+struct ProbePackedView {const BLPoint* vertices;const uint8_t* commands;const ProbePackedPart* parts;size_t count;};
+struct ProbePackedRef {const ProbePackedView* view;uint32_t first,count;};
+
+struct ProbeStrokePart {const BLPathCore* a;const BLPathCore* b;const BLPathCore* c;};
+struct ProbeStrokeView {const ProbeStrokePart* parts;size_t count;};
+
 struct SplitFillPart {
   size_t begin, end;
   BLBoxI bounds;
@@ -149,6 +159,10 @@ struct RenderJob_GeometryOp : public RenderJob_BaseOp {
   BL_INLINE void init_stroke_job(RenderCommandQueue* command_queue, size_t command_index) noexcept {
     _init_internal(RenderJobType::kStrokeGeometry, command_queue, command_index);
   }
+
+  BL_INLINE_NODEBUG ProbePackedRef* packed_stroke_ref() noexcept { return reinterpret_cast<ProbePackedRef*>(geometry_data<uint8_t>() + sizeof(BLPathCore)); }
+
+  BL_INLINE_NODEBUG const ProbeStrokeView*& cached_stroke_view() noexcept { return *reinterpret_cast<const ProbeStrokeView**>(geometry_data<uint8_t>() + sizeof(BLPathCore)); }
 
   BL_INLINE_NODEBUG SplitFillRef* split_fill_ref() noexcept { return reinterpret_cast<SplitFillRef*>(geometry_data<uint8_t>() + sizeof(BLPathCore)); }
 
