@@ -37,26 +37,33 @@ static BL_NOINLINE void process_jobs(WorkData* work_data, RenderBatch* batch) no
   const RenderJobQueue* queue = batch->job_list().first();
   BL_ASSERT(queue != nullptr);
 
+  // Claim a small group at once to amortize contention on the shared job counter.
+  // Small batches can contain a few disproportionately expensive paths. Keep
+  // individual claims there; larger batches retain at least four groups per worker.
+  const size_t chunk = job_count < 1024 ? 1 : bl_max<size_t>(1, bl_min<size_t>(16, job_count / (size_t(batch->worker_count()) * 4)));
   size_t queue_index = 0;
   size_t queue_end = queue_index + queue->size();
 
   for (;;) {
-    size_t job_index = batch->next_job_index();
+    size_t job_index = batch->next_job_index(chunk);
     if (job_index >= job_count)
       break;
 
-    while (job_index >= queue_end) {
-      queue = queue->next();
-      BL_ASSERT(queue != nullptr);
+    size_t job_end = job_index + bl_min(chunk, job_count - job_index);
+    for (; job_index < job_end; job_index++) {
+      while (job_index >= queue_end) {
+        queue = queue->next();
+        BL_ASSERT(queue != nullptr);
 
-      queue_index = queue_end;
-      queue_end = queue_index + queue->size();
+        queue_index = queue_end;
+        queue_end = queue_index + queue->size();
+      }
+
+      RenderJob* job = queue->at(job_index - queue_index);
+      BL_ASSERT(job != nullptr);
+
+      JobProc::process_job(work_data, job);
     }
-
-    RenderJob* job = queue->at(job_index - queue_index);
-    BL_ASSERT(job != nullptr);
-
-    JobProc::process_job(work_data, job);
   }
 
   work_data->avoid_cache_line_sharing();

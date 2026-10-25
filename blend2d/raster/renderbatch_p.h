@@ -56,7 +56,7 @@ public:
   //! name Accessors
   //! \{
 
-  BL_INLINE_NODEBUG size_t next_job_index() noexcept { return bl_atomic_fetch_add_strong(&_job_index); }
+  BL_INLINE_NODEBUG size_t next_job_index(size_t count = 1) noexcept { return bl_atomic_fetch_add_strong(&_job_index, count); }
 
   BL_INLINE_NODEBUG const ArenaList<RenderJobQueue>& job_list() const noexcept { return _job_list; }
   BL_INLINE_NODEBUG const ArenaList<RenderCommandQueue>& command_list() const noexcept { return _command_list; }
