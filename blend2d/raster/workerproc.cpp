@@ -40,7 +40,7 @@ static BL_NOINLINE void process_jobs(WorkData* work_data, RenderBatch* batch) no
   // Claim a small group at once to amortize contention on the shared job counter.
   // Small batches can contain a few disproportionately expensive paths. Keep
   // individual claims there; larger batches retain at least four groups per worker.
-  const size_t chunk = job_count < 1024 ? 1 : bl_max<size_t>(1, bl_min<size_t>(16, job_count / (size_t(batch->worker_count()) * 4)));
+  const size_t chunk = (batch->_has_split_fill || job_count < 1024) ? 1 : bl_max<size_t>(1, bl_min<size_t>(16, job_count / (size_t(batch->worker_count()) * 4)));
   size_t queue_index = 0;
   size_t queue_end = queue_index + queue->size();
 
