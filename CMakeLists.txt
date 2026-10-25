@@ -30,6 +30,7 @@ set(BLEND2D_SANITIZE_OPTS      "" CACHE STRING "Extra flags for sanitizers (deve
 
 option(BLEND2D_STATIC          "Build 'blend2d' as a static library instead" OFF)
 option(BLEND2D_TEST            "Build 'blend2d' tests and samples (development)" OFF)
+option(BLEND2D_EXPERIMENTAL_REDRAW "Build review-only retained-redraw fixtures (POSIX/static)" OFF)
 option(BLEND2D_DEMOS           "Build 'blend2d' interactive demos that use Qt library (development)" OFF)
 
 option(BLEND2D_NO_NATVIS       "Disable 'blend2d' natvis support (development)" OFF)
@@ -1272,6 +1273,11 @@ if (BLEND2D_DEMOS)
   target_link_directories(bl_bench PRIVATE ${BLEND2D_BENCH_LIBRARY_DIRS})
 else()
   message(STATUS "[blend2d] Disabling Blend2D demos ('BLEND2D_DEMOS=OFF')")
+endif()
+
+if(BLEND2D_EXPERIMENTAL_REDRAW)
+  enable_testing()
+  include(blend2d-testing/experimental-redraw/CMakeLists.txt)
 endif()
 
 message(STATUS "[blend2d] == Configuring done ==")

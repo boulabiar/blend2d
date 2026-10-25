@@ -1,0 +1,482 @@
+Start testing: Oct 25 08:42 CET
+----------------------------------------------------------
+1/4 Testing: bl_review_equivalence
+1/4 Test: bl_review_equivalence
+Command: "<review-build>/bl_review_equivalence"
+Directory: <review-build>
+"bl_review_equivalence" start time: Oct 25 08:42 CET
+Output:
+----------------------------------------------------------
+STROKE_CACHE mode=4 paths=167 source_entries=883 outline_entries=12978
+STROKE_CACHE mode=5 paths=167 source_entries=883 outline_entries=12978
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE owner=0 rows=0:64 threads=8 domain=0
+TILE owner=1 rows=64:128 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=501 input_points=2650 assigned_points=2802
+TILE owner=0 rows=0:64 threads=8 domain=0
+TILE owner=1 rows=64:128 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=501 input_points=2650 assigned_points=2802
+TILE owner=0 rows=0:64 threads=8 domain=0
+TILE owner=1 rows=64:128 threads=8 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=501 input_points=2650 assigned_points=2802
+TILE owner=0 rows=0:64 threads=16 domain=0
+TILE owner=1 rows=64:128 threads=16 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=501 input_points=2650 assigned_points=2802
+TILE owner=0 rows=0:64 threads=16 domain=0
+TILE owner=1 rows=64:128 threads=16 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=501 input_points=2650 assigned_points=2802
+TILE owner=0 rows=0:64 threads=8 domain=0
+TILE owner=1 rows=64:128 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=501 input_points=2650 assigned_points=2802
+TAPE_PLAN batches=1 commands=483 jobs=482 arena_bytes=262088
+TILE owner=0 rows=0:64 threads=8 domain=0
+TILE owner=1 rows=64:128 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=501 input_points=2650 assigned_points=2802
+TAPE_PLAN batches=1 commands=232 jobs=231 arena_bytes=262088
+TAPE_PLAN batches=1 commands=271 jobs=270 arena_bytes=262088
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TAPE_PLAN batches=1 commands=483 jobs=482 arena_bytes=262088
+TILE owner=0 rows=0:64 threads=8 domain=0
+TILE owner=1 rows=64:128 threads=8 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=501 input_points=2650 assigned_points=2802
+TAPE_PLAN batches=1 commands=232 jobs=231 arena_bytes=262088
+TAPE_PLAN batches=1 commands=271 jobs=270 arena_bytes=262088
+TILE owner=0 rows=0:64 threads=8 domain=0
+TILE owner=1 rows=64:128 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=501 input_points=2650 assigned_points=2802
+TILE owner=0 rows=0:64 threads=16 domain=0
+TILE owner=1 rows=64:128 threads=16 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=501 input_points=2650 assigned_points=2802
+TAPE_PLAN batches=1 commands=232 jobs=231 arena_bytes=262088
+TAPE_PLAN batches=1 commands=271 jobs=270 arena_bytes=262088
+STROKE_CACHE mode=4 paths=167 source_entries=883 outline_entries=12978
+STROKE_CACHE mode=5 paths=167 source_entries=883 outline_entries=12978
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE owner=0 rows=0:64 threads=8 domain=0
+TILE owner=1 rows=64:128 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=515 input_points=2650 assigned_points=2783
+TILE owner=0 rows=0:64 threads=8 domain=0
+TILE owner=1 rows=64:128 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=515 input_points=2650 assigned_points=2783
+TILE owner=0 rows=0:64 threads=8 domain=0
+TILE owner=1 rows=64:128 threads=8 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=515 input_points=2650 assigned_points=2783
+TILE owner=0 rows=0:64 threads=16 domain=0
+TILE owner=1 rows=64:128 threads=16 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=515 input_points=2650 assigned_points=2783
+TILE owner=0 rows=0:64 threads=16 domain=0
+TILE owner=1 rows=64:128 threads=16 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=515 input_points=2650 assigned_points=2783
+TILE owner=0 rows=0:64 threads=8 domain=0
+TILE owner=1 rows=64:128 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=515 input_points=2650 assigned_points=2783
+TAPE_PLAN batches=1 commands=483 jobs=482 arena_bytes=262088
+TILE owner=0 rows=0:64 threads=8 domain=0
+TILE owner=1 rows=64:128 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=515 input_points=2650 assigned_points=2783
+TAPE_PLAN batches=1 commands=252 jobs=251 arena_bytes=262088
+TAPE_PLAN batches=1 commands=264 jobs=263 arena_bytes=262088
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TAPE_PLAN batches=1 commands=483 jobs=482 arena_bytes=262088
+TILE owner=0 rows=0:64 threads=8 domain=0
+TILE owner=1 rows=64:128 threads=8 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=515 input_points=2650 assigned_points=2783
+TAPE_PLAN batches=1 commands=252 jobs=251 arena_bytes=262088
+TAPE_PLAN batches=1 commands=264 jobs=263 arena_bytes=262088
+TILE owner=0 rows=0:64 threads=8 domain=0
+TILE owner=1 rows=64:128 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=515 input_points=2650 assigned_points=2783
+TILE owner=0 rows=0:64 threads=16 domain=0
+TILE owner=1 rows=64:128 threads=16 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=515 input_points=2650 assigned_points=2783
+TAPE_PLAN batches=1 commands=252 jobs=251 arena_bytes=262088
+TAPE_PLAN batches=1 commands=264 jobs=263 arena_bytes=262088
+STROKE_CACHE mode=4 paths=167 source_entries=883 outline_entries=12978
+STROKE_CACHE mode=5 paths=167 source_entries=883 outline_entries=12978
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE owner=0 rows=0:128 threads=8 domain=0
+TILE owner=1 rows=128:257 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=489 input_points=2650 assigned_points=2622
+TILE owner=0 rows=0:64 threads=4 domain=0
+TILE owner=1 rows=64:128 threads=4 domain=1
+TILE owner=2 rows=128:192 threads=4 domain=0
+TILE owner=3 rows=192:257 threads=4 domain=1
+TILE_PLAN inputs=500 assigned=593 input_points=2650 assigned_points=3169
+TILE owner=0 rows=0:128 threads=8 domain=0
+TILE owner=1 rows=128:257 threads=8 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=489 input_points=2650 assigned_points=2622
+TILE owner=0 rows=0:128 threads=16 domain=0
+TILE owner=1 rows=128:257 threads=16 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=489 input_points=2650 assigned_points=2622
+TILE owner=0 rows=0:64 threads=8 domain=0
+TILE owner=1 rows=64:128 threads=8 domain=1
+TILE owner=2 rows=128:192 threads=8 domain=0
+TILE owner=3 rows=192:257 threads=8 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=593 input_points=2650 assigned_points=3169
+TILE owner=0 rows=0:128 threads=8 domain=0
+TILE owner=1 rows=128:257 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=489 input_points=2650 assigned_points=2622
+TAPE_PLAN batches=1 commands=483 jobs=482 arena_bytes=262088
+TILE owner=0 rows=0:128 threads=8 domain=0
+TILE owner=1 rows=128:257 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=489 input_points=2650 assigned_points=2622
+TAPE_PLAN batches=1 commands=238 jobs=237 arena_bytes=262088
+TAPE_PLAN batches=1 commands=252 jobs=251 arena_bytes=262088
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TAPE_PLAN batches=1 commands=483 jobs=482 arena_bytes=262088
+TILE owner=0 rows=0:128 threads=8 domain=0
+TILE owner=1 rows=128:257 threads=8 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=489 input_points=2650 assigned_points=2622
+TAPE_PLAN batches=1 commands=238 jobs=237 arena_bytes=262088
+TAPE_PLAN batches=1 commands=252 jobs=251 arena_bytes=262088
+TILE owner=0 rows=0:256 threads=8 domain=0
+TILE owner=1 rows=256:257 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=502 input_points=2650 assigned_points=2689
+TILE owner=0 rows=0:256 threads=16 domain=0
+TILE owner=1 rows=256:257 threads=16 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=502 input_points=2650 assigned_points=2689
+TAPE_PLAN batches=1 commands=71 jobs=70 arena_bytes=262088
+TAPE_PLAN batches=1 commands=431 jobs=430 arena_bytes=262088
+STROKE_CACHE mode=4 paths=167 source_entries=883 outline_entries=12978
+STROKE_CACHE mode=5 paths=167 source_entries=883 outline_entries=12978
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE owner=0 rows=0:128 threads=8 domain=0
+TILE owner=1 rows=128:257 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=498 input_points=2650 assigned_points=2695
+TILE owner=0 rows=0:64 threads=4 domain=0
+TILE owner=1 rows=64:128 threads=4 domain=1
+TILE owner=2 rows=128:192 threads=4 domain=0
+TILE owner=3 rows=192:257 threads=4 domain=1
+TILE_PLAN inputs=500 assigned=629 input_points=2650 assigned_points=3439
+TILE owner=0 rows=0:128 threads=8 domain=0
+TILE owner=1 rows=128:257 threads=8 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=498 input_points=2650 assigned_points=2695
+TILE owner=0 rows=0:128 threads=16 domain=0
+TILE owner=1 rows=128:257 threads=16 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=498 input_points=2650 assigned_points=2695
+TILE owner=0 rows=0:64 threads=8 domain=0
+TILE owner=1 rows=64:128 threads=8 domain=1
+TILE owner=2 rows=128:192 threads=8 domain=0
+TILE owner=3 rows=192:257 threads=8 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=629 input_points=2650 assigned_points=3439
+TILE owner=0 rows=0:128 threads=8 domain=0
+TILE owner=1 rows=128:257 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=498 input_points=2650 assigned_points=2695
+TAPE_PLAN batches=1 commands=483 jobs=482 arena_bytes=262088
+TILE owner=0 rows=0:128 threads=8 domain=0
+TILE owner=1 rows=128:257 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=498 input_points=2650 assigned_points=2695
+TAPE_PLAN batches=1 commands=256 jobs=255 arena_bytes=262088
+TAPE_PLAN batches=1 commands=243 jobs=242 arena_bytes=262088
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TAPE_PLAN batches=1 commands=483 jobs=482 arena_bytes=262088
+TILE owner=0 rows=0:128 threads=8 domain=0
+TILE owner=1 rows=128:257 threads=8 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=498 input_points=2650 assigned_points=2695
+TAPE_PLAN batches=1 commands=256 jobs=255 arena_bytes=262088
+TAPE_PLAN batches=1 commands=243 jobs=242 arena_bytes=262088
+TILE owner=0 rows=0:256 threads=8 domain=0
+TILE owner=1 rows=256:257 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=490 input_points=2650 assigned_points=2608
+TILE owner=0 rows=0:256 threads=16 domain=0
+TILE owner=1 rows=256:257 threads=16 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=490 input_points=2650 assigned_points=2608
+TAPE_PLAN batches=1 commands=54 jobs=53 arena_bytes=262088
+TAPE_PLAN batches=1 commands=435 jobs=434 arena_bytes=262088
+STROKE_CACHE mode=4 paths=167 source_entries=883 outline_entries=12978
+STROKE_CACHE mode=5 paths=167 source_entries=883 outline_entries=12978
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE owner=0 rows=0:128 threads=8 domain=0
+TILE owner=1 rows=128:321 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=497 input_points=2650 assigned_points=2661
+TILE owner=0 rows=0:64 threads=4 domain=0
+TILE owner=1 rows=64:128 threads=4 domain=1
+TILE owner=2 rows=128:192 threads=4 domain=0
+TILE owner=3 rows=192:321 threads=4 domain=1
+TILE_PLAN inputs=500 assigned=603 input_points=2650 assigned_points=3266
+TILE owner=0 rows=0:128 threads=8 domain=0
+TILE owner=1 rows=128:321 threads=8 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=497 input_points=2650 assigned_points=2661
+TILE owner=0 rows=0:128 threads=16 domain=0
+TILE owner=1 rows=128:321 threads=16 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=497 input_points=2650 assigned_points=2661
+TILE owner=0 rows=0:64 threads=8 domain=0
+TILE owner=1 rows=64:128 threads=8 domain=1
+TILE owner=2 rows=128:192 threads=8 domain=0
+TILE owner=3 rows=192:321 threads=8 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=603 input_points=2650 assigned_points=3266
+TILE owner=0 rows=0:128 threads=8 domain=0
+TILE owner=1 rows=128:321 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=497 input_points=2650 assigned_points=2661
+TAPE_PLAN batches=1 commands=483 jobs=482 arena_bytes=262088
+TILE owner=0 rows=0:128 threads=8 domain=0
+TILE owner=1 rows=128:321 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=497 input_points=2650 assigned_points=2661
+TAPE_PLAN batches=1 commands=201 jobs=200 arena_bytes=262088
+TAPE_PLAN batches=1 commands=298 jobs=297 arena_bytes=262088
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TAPE_PLAN batches=1 commands=483 jobs=482 arena_bytes=262088
+TILE owner=0 rows=0:128 threads=8 domain=0
+TILE owner=1 rows=128:321 threads=8 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=497 input_points=2650 assigned_points=2661
+TAPE_PLAN batches=1 commands=201 jobs=200 arena_bytes=262088
+TAPE_PLAN batches=1 commands=298 jobs=297 arena_bytes=262088
+TILE owner=0 rows=0:320 threads=8 domain=0
+TILE owner=1 rows=320:321 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=492 input_points=2650 assigned_points=2644
+TILE owner=0 rows=0:320 threads=16 domain=0
+TILE owner=1 rows=320:321 threads=16 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=492 input_points=2650 assigned_points=2644
+TAPE_PLAN batches=1 commands=50 jobs=49 arena_bytes=262088
+TAPE_PLAN batches=1 commands=441 jobs=440 arena_bytes=262088
+STROKE_CACHE mode=4 paths=167 source_entries=883 outline_entries=12978
+STROKE_CACHE mode=5 paths=167 source_entries=883 outline_entries=12978
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE owner=0 rows=0:128 threads=8 domain=0
+TILE owner=1 rows=128:321 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=509 input_points=2650 assigned_points=2735
+TILE owner=0 rows=0:64 threads=4 domain=0
+TILE owner=1 rows=64:128 threads=4 domain=1
+TILE owner=2 rows=128:192 threads=4 domain=0
+TILE owner=3 rows=192:321 threads=4 domain=1
+TILE_PLAN inputs=500 assigned=620 input_points=2650 assigned_points=3384
+TILE owner=0 rows=0:128 threads=8 domain=0
+TILE owner=1 rows=128:321 threads=8 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=509 input_points=2650 assigned_points=2735
+TILE owner=0 rows=0:128 threads=16 domain=0
+TILE owner=1 rows=128:321 threads=16 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=509 input_points=2650 assigned_points=2735
+TILE owner=0 rows=0:64 threads=8 domain=0
+TILE owner=1 rows=64:128 threads=8 domain=1
+TILE owner=2 rows=128:192 threads=8 domain=0
+TILE owner=3 rows=192:321 threads=8 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=620 input_points=2650 assigned_points=3384
+TILE owner=0 rows=0:128 threads=8 domain=0
+TILE owner=1 rows=128:321 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=509 input_points=2650 assigned_points=2735
+TAPE_PLAN batches=1 commands=483 jobs=482 arena_bytes=262088
+TILE owner=0 rows=0:128 threads=8 domain=0
+TILE owner=1 rows=128:321 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=509 input_points=2650 assigned_points=2735
+TAPE_PLAN batches=1 commands=210 jobs=209 arena_bytes=262088
+TAPE_PLAN batches=1 commands=299 jobs=298 arena_bytes=262088
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TAPE_PLAN batches=1 commands=483 jobs=482 arena_bytes=262088
+TILE owner=0 rows=0:128 threads=8 domain=0
+TILE owner=1 rows=128:321 threads=8 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=509 input_points=2650 assigned_points=2735
+TAPE_PLAN batches=1 commands=210 jobs=209 arena_bytes=262088
+TAPE_PLAN batches=1 commands=299 jobs=298 arena_bytes=262088
+TILE owner=0 rows=0:320 threads=8 domain=0
+TILE owner=1 rows=320:321 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=501 input_points=2650 assigned_points=2662
+TILE owner=0 rows=0:320 threads=16 domain=0
+TILE owner=1 rows=320:321 threads=16 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=501 input_points=2650 assigned_points=2662
+TAPE_PLAN batches=1 commands=54 jobs=53 arena_bytes=262088
+TAPE_PLAN batches=1 commands=446 jobs=445 arena_bytes=262088
+STROKE_CACHE mode=4 paths=167 source_entries=883 outline_entries=12978
+STROKE_CACHE mode=5 paths=167 source_entries=883 outline_entries=12978
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE owner=0 rows=0:1024 threads=8 domain=0
+TILE owner=1 rows=1024:2048 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=477 input_points=2650 assigned_points=2540
+TILE owner=0 rows=0:512 threads=4 domain=0
+TILE owner=1 rows=512:1024 threads=4 domain=1
+TILE owner=2 rows=1024:1536 threads=4 domain=0
+TILE owner=3 rows=1536:2048 threads=4 domain=1
+TILE_PLAN inputs=500 assigned=492 input_points=2650 assigned_points=2626
+TILE owner=0 rows=0:1024 threads=8 domain=0
+TILE owner=1 rows=1024:2048 threads=8 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=477 input_points=2650 assigned_points=2540
+TILE owner=0 rows=0:1024 threads=16 domain=0
+TILE owner=1 rows=1024:2048 threads=16 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=477 input_points=2650 assigned_points=2540
+TILE owner=0 rows=0:512 threads=8 domain=0
+TILE owner=1 rows=512:1024 threads=8 domain=1
+TILE owner=2 rows=1024:1536 threads=8 domain=0
+TILE owner=3 rows=1536:2048 threads=8 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=492 input_points=2650 assigned_points=2626
+TILE owner=0 rows=0:1024 threads=8 domain=0
+TILE owner=1 rows=1024:2048 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=477 input_points=2650 assigned_points=2540
+TAPE_PLAN batches=1 commands=483 jobs=482 arena_bytes=262088
+TILE owner=0 rows=0:1024 threads=8 domain=0
+TILE owner=1 rows=1024:2048 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=477 input_points=2650 assigned_points=2540
+TAPE_PLAN batches=1 commands=222 jobs=221 arena_bytes=262088
+TAPE_PLAN batches=1 commands=255 jobs=254 arena_bytes=262088
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TAPE_PLAN batches=1 commands=483 jobs=482 arena_bytes=262088
+TILE owner=0 rows=0:1024 threads=8 domain=0
+TILE owner=1 rows=1024:2048 threads=8 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=477 input_points=2650 assigned_points=2540
+TAPE_PLAN batches=1 commands=222 jobs=221 arena_bytes=262088
+TAPE_PLAN batches=1 commands=255 jobs=254 arena_bytes=262088
+TILE owner=0 rows=0:1280 threads=8 domain=0
+TILE owner=1 rows=1280:2048 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=475 input_points=2650 assigned_points=2533
+TILE owner=0 rows=0:1280 threads=16 domain=0
+TILE owner=1 rows=1280:2048 threads=16 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=475 input_points=2650 assigned_points=2533
+TAPE_PLAN batches=1 commands=192 jobs=191 arena_bytes=262088
+TAPE_PLAN batches=1 commands=283 jobs=282 arena_bytes=262088
+STROKE_CACHE mode=4 paths=167 source_entries=883 outline_entries=12978
+STROKE_CACHE mode=5 paths=167 source_entries=883 outline_entries=12978
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE owner=0 rows=0:1024 threads=8 domain=0
+TILE owner=1 rows=1024:2048 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=476 input_points=2650 assigned_points=2523
+TILE owner=0 rows=0:512 threads=4 domain=0
+TILE owner=1 rows=512:1024 threads=4 domain=1
+TILE owner=2 rows=1024:1536 threads=4 domain=0
+TILE owner=3 rows=1536:2048 threads=4 domain=1
+TILE_PLAN inputs=500 assigned=496 input_points=2650 assigned_points=2642
+TILE owner=0 rows=0:1024 threads=8 domain=0
+TILE owner=1 rows=1024:2048 threads=8 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=476 input_points=2650 assigned_points=2523
+TILE owner=0 rows=0:1024 threads=16 domain=0
+TILE owner=1 rows=1024:2048 threads=16 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=476 input_points=2650 assigned_points=2523
+TILE owner=0 rows=0:512 threads=8 domain=0
+TILE owner=1 rows=512:1024 threads=8 domain=1
+TILE owner=2 rows=1024:1536 threads=8 domain=0
+TILE owner=3 rows=1536:2048 threads=8 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=496 input_points=2650 assigned_points=2642
+TILE owner=0 rows=0:1024 threads=8 domain=0
+TILE owner=1 rows=1024:2048 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=476 input_points=2650 assigned_points=2523
+TAPE_PLAN batches=1 commands=483 jobs=482 arena_bytes=262088
+TILE owner=0 rows=0:1024 threads=8 domain=0
+TILE owner=1 rows=1024:2048 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=476 input_points=2650 assigned_points=2523
+TAPE_PLAN batches=1 commands=216 jobs=215 arena_bytes=262088
+TAPE_PLAN batches=1 commands=260 jobs=259 arena_bytes=262088
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TAPE_PLAN batches=1 commands=483 jobs=482 arena_bytes=262088
+TILE owner=0 rows=0:1024 threads=8 domain=0
+TILE owner=1 rows=1024:2048 threads=8 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=476 input_points=2650 assigned_points=2523
+TAPE_PLAN batches=1 commands=216 jobs=215 arena_bytes=262088
+TAPE_PLAN batches=1 commands=260 jobs=259 arena_bytes=262088
+TILE owner=0 rows=0:1280 threads=8 domain=0
+TILE owner=1 rows=1280:2048 threads=8 domain=1
+TILE_PLAN inputs=500 assigned=480 input_points=2650 assigned_points=2536
+TILE owner=0 rows=0:1280 threads=16 domain=0
+TILE owner=1 rows=1280:2048 threads=16 domain=1
+STROKE_CACHE mode=6 paths=167 source_entries=883 outline_entries=12978
+TILE_PLAN inputs=500 assigned=480 input_points=2650 assigned_points=2536
+TAPE_PLAN batches=1 commands=288 jobs=287 arena_bytes=262088
+TAPE_PLAN batches=1 commands=191 jobs=190 arena_bytes=262088
+Exact replay: size=128 seed=1, all variants; two redraws each
+Exact replay: size=128 seed=987654321, all variants; two redraws each
+Exact replay: size=257 seed=1, all variants; two redraws each
+Exact replay: size=257 seed=987654321, all variants; two redraws each
+Exact replay: size=321 seed=1, all variants; two redraws each
+Exact replay: size=321 seed=987654321, all variants; two redraws each
+Exact replay: size=2048 seed=1, all variants; two redraws each
+Exact replay: size=2048 seed=987654321, all variants; two redraws each
+<end of output>
+Test time =   1.07 sec
+----------------------------------------------------------
+Test Passed.
+"bl_review_equivalence" end time: Oct 25 08:42 CET
+"bl_review_equivalence" time elapsed: 00:00:01
+----------------------------------------------------------
+
+2/4 Testing: bl_review_split_fill
+2/4 Test: bl_review_split_fill
+Command: "<review-build>/bl_review_split_fill"
+Directory: <review-build>
+"bl_review_split_fill" start time: Oct 25 08:42 CET
+Output:
+----------------------------------------------------------
+8 giant-fill scenes match synchronous/1/4/16 threads exactly.
+<end of output>
+Test time =   0.16 sec
+----------------------------------------------------------
+Test Passed.
+"bl_review_split_fill" end time: Oct 25 08:42 CET
+"bl_review_split_fill" time elapsed: 00:00:00
+----------------------------------------------------------
+
+3/4 Testing: bl_review_render
+3/4 Test: bl_review_render
+Command: "<review-build>/bl_review_render"
+Directory: <review-build>
+"bl_review_render" start time: Oct 25 08:42 CET
+Output:
+----------------------------------------------------------
+All 6 scenes match exactly at 1/4/16 threads (324,000 draws).
+<end of output>
+Test time =   0.33 sec
+----------------------------------------------------------
+Test Passed.
+"bl_review_render" end time: Oct 25 08:42 CET
+"bl_review_render" time elapsed: 00:00:00
+----------------------------------------------------------
+
+4/4 Testing: bl_review_type_predicates
+4/4 Test: bl_review_type_predicates
+Command: "<review-build>/bl_review_type_predicates"
+Directory: <review-build>
+"bl_review_type_predicates" start time: Oct 25 08:42 CET
+Output:
+----------------------------------------------------------
+checks=168 failures=0
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"bl_review_type_predicates" end time: Oct 25 08:42 CET
+"bl_review_type_predicates" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 25 08:42 CET

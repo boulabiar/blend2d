@@ -1,0 +1,252 @@
+{
+  "6000-DRG-01-M-001.pdf": {
+    "name": "record-packed-bands2",
+    "mask": "0-15",
+    "queue_per_context": 16384,
+    "env": {
+      "BLEND_PROBE_PREPARED": "1",
+      "BLEND_PROBE_TILES": "2",
+      "BLEND_PROBE_RECORD": "1",
+      "BLEND_PROBE_PRESTROKE": "6",
+      "BLEND_PROBE_TILE_CUT": "768"
+    },
+    "cpu_ms": 24.412,
+    "round_min_ms": 24.341,
+    "round_max_ms": 24.564,
+    "reference_sha256": "97e9fcbb7b9f084cacd547698a600b50146d3a05e67457899fa25ddc4e0c4c22"
+  },
+  "Anime_Girl.svg": {
+    "name": "record-packed-bands2",
+    "mask": "0-15",
+    "queue_per_context": 16384,
+    "env": {
+      "BLEND_PROBE_PREPARED": "1",
+      "BLEND_PROBE_TILES": "2",
+      "BLEND_PROBE_RECORD": "1",
+      "BLEND_PROBE_PRESTROKE": "6",
+      "BLEND_PROBE_TILE_CUT": "1024"
+    },
+    "cpu_ms": 1.632,
+    "round_min_ms": 1.624,
+    "round_max_ms": 1.673,
+    "reference_sha256": "409f7de877f135abe97ecf68ea8c88d58a92ef42313ec0581a54f4087e30bc4b"
+  },
+  "AntigenicShift_HiRes.svg": {
+    "name": "record-packed-bands4",
+    "mask": "0-15",
+    "queue_per_context": 8192,
+    "env": {
+      "BLEND_PROBE_PREPARED": "1",
+      "BLEND_PROBE_TILES": "4",
+      "BLEND_PROBE_RECORD": "1",
+      "BLEND_PROBE_PRESTROKE": "6"
+    },
+    "cpu_ms": 1.27,
+    "round_min_ms": 1.254,
+    "round_max_ms": 1.274,
+    "reference_sha256": "46aaa7dec00939bf576a185714b9bb7d5a67a22e2c895b1e10e379d13b417ffd"
+  },
+  "Manchester_Union_Democrat_office_1877.svg": {
+    "name": "record-packed-bands2",
+    "mask": "0-15",
+    "queue_per_context": 16384,
+    "env": {
+      "BLEND_PROBE_PREPARED": "1",
+      "BLEND_PROBE_TILES": "2",
+      "BLEND_PROBE_RECORD": "1",
+      "BLEND_PROBE_PRESTROKE": "6",
+      "BLEND_PROBE_TILE_CUT": "1024"
+    },
+    "cpu_ms": 5.686,
+    "round_min_ms": 4.451,
+    "round_max_ms": 5.985,
+    "reference_sha256": "37b38dbc21b2bacc995389c678a9e293435e1f0254444b16c14c98b726b58aed"
+  },
+  "PToT_hi-res_source_nobackground.svg": {
+    "name": "record-packed-bands2",
+    "mask": "0-15",
+    "queue_per_context": 16384,
+    "env": {
+      "BLEND_PROBE_PREPARED": "1",
+      "BLEND_PROBE_TILES": "2",
+      "BLEND_PROBE_RECORD": "1",
+      "BLEND_PROBE_PRESTROKE": "6",
+      "BLEND_PROBE_TILE_CUT": "1024"
+    },
+    "cpu_ms": 0.941,
+    "round_min_ms": 0.939,
+    "round_max_ms": 0.945,
+    "reference_sha256": "34e0fe08674efdb33106b13e56689d2dd178f1f4486eb4bb94b3b4e6ab4b47b3"
+  },
+  "Paris 30K.pdf": {
+    "name": "record-packed-bands2",
+    "mask": "0-15",
+    "queue_per_context": 16384,
+    "env": {
+      "BLEND_PROBE_PREPARED": "1",
+      "BLEND_PROBE_TILES": "2",
+      "BLEND_PROBE_RECORD": "1",
+      "BLEND_PROBE_PRESTROKE": "6",
+      "BLEND_PROBE_TILE_CUT": "1024"
+    },
+    "cpu_ms": 6.731,
+    "round_min_ms": 6.631,
+    "round_max_ms": 6.781,
+    "reference_sha256": "9aed35799d1a94387e9aea44e8f965e1d75648bf1eb6365c75b4dc9d8dc9f11b"
+  },
+  "car.pdf": {
+    "name": "record-one",
+    "mask": "0-15",
+    "queue_per_context": 32768,
+    "env": {
+      "BLEND_PROBE_PREPARED": "1",
+      "BLEND_PROBE_RECORD": "1",
+      "BLEND_PROBE_PRESTROKE": "0"
+    },
+    "cpu_ms": 3.912,
+    "round_min_ms": 3.664,
+    "round_max_ms": 5.956,
+    "reference_sha256": "d8c5e3f32d4554fc9de1b0be5395207f40a6bf6169267024e6c8659ba77ffb85"
+  },
+  "contour.svg": {
+    "name": "record-packed-bands4",
+    "mask": "0-15",
+    "queue_per_context": 8192,
+    "env": {
+      "BLEND_PROBE_PREPARED": "1",
+      "BLEND_PROBE_TILES": "4",
+      "BLEND_PROBE_RECORD": "1",
+      "BLEND_PROBE_PRESTROKE": "6"
+    },
+    "cpu_ms": 2.501,
+    "round_min_ms": 2.487,
+    "round_max_ms": 2.518,
+    "reference_sha256": "b7a487583caa7c40c277c5ed21b47310fdbeed1a3e5d56144c2b0bfc6491d8ba"
+  },
+  "designcloud.pdf": {
+    "name": "record-packed-bands2",
+    "mask": "0-15",
+    "queue_per_context": 16384,
+    "env": {
+      "BLEND_PROBE_PREPARED": "1",
+      "BLEND_PROBE_TILES": "2",
+      "BLEND_PROBE_RECORD": "1",
+      "BLEND_PROBE_PRESTROKE": "6",
+      "BLEND_PROBE_TILE_CUT": "1024"
+    },
+    "cpu_ms": 7.911,
+    "round_min_ms": 7.852,
+    "round_max_ms": 7.921,
+    "reference_sha256": "3cd3e5913180365306a3216922bcaf35499db5688cf12371f1191469a8b46a38"
+  },
+  "drops.pdf": {
+    "name": "record-packed-bands2",
+    "mask": "0-15",
+    "queue_per_context": 16384,
+    "env": {
+      "BLEND_PROBE_PREPARED": "1",
+      "BLEND_PROBE_TILES": "2",
+      "BLEND_PROBE_RECORD": "1",
+      "BLEND_PROBE_PRESTROKE": "6",
+      "BLEND_PROBE_TILE_CUT": "1024"
+    },
+    "cpu_ms": 3.51,
+    "round_min_ms": 3.481,
+    "round_max_ms": 3.603,
+    "reference_sha256": "6a4db53d8102d6c95f8911dbc4386c2b95bf47b052ae4ba643b5910ce20fc464"
+  },
+  "embrace.pdf": {
+    "name": "record-packed-bands2",
+    "mask": "0-15",
+    "queue_per_context": 16384,
+    "env": {
+      "BLEND_PROBE_PREPARED": "1",
+      "BLEND_PROBE_TILES": "2",
+      "BLEND_PROBE_RECORD": "1",
+      "BLEND_PROBE_PRESTROKE": "6",
+      "BLEND_PROBE_TILE_CUT": "1024"
+    },
+    "cpu_ms": 3.685,
+    "round_min_ms": 3.65,
+    "round_max_ms": 3.762,
+    "reference_sha256": "d2f00bcc41113cfb706da3f90e315e8c23f613d5d9bc1a062e59f7ca4b0559b3"
+  },
+  "hawaii.svg": {
+    "name": "record-packed-bands2",
+    "mask": "0-15",
+    "queue_per_context": 16384,
+    "env": {
+      "BLEND_PROBE_PREPARED": "1",
+      "BLEND_PROBE_TILES": "2",
+      "BLEND_PROBE_RECORD": "1",
+      "BLEND_PROBE_PRESTROKE": "6",
+      "BLEND_PROBE_TILE_CUT": "1024"
+    },
+    "cpu_ms": 1.206,
+    "round_min_ms": 1.173,
+    "round_max_ms": 1.217,
+    "reference_sha256": "bb818d8508f1e50691b413134ebfddeff4247c564be8146c364f8099e36be384"
+  },
+  "pathological.pdf": {
+    "name": "record-packed-bands2",
+    "mask": "0-15",
+    "queue_per_context": 16384,
+    "env": {
+      "BLEND_PROBE_PREPARED": "1",
+      "BLEND_PROBE_TILES": "2",
+      "BLEND_PROBE_RECORD": "1",
+      "BLEND_PROBE_PRESTROKE": "6",
+      "BLEND_PROBE_TILE_CUT": "1280"
+    },
+    "cpu_ms": 25.812,
+    "round_min_ms": 25.717,
+    "round_max_ms": 26.945,
+    "reference_sha256": "da9d065bc74ed969e27e32d4fbe524ca91b4fd06654720f2b8d80c0bc7313416"
+  },
+  "reschart.svg": {
+    "name": "record-packed-bands2",
+    "mask": "0-15",
+    "queue_per_context": 16384,
+    "env": {
+      "BLEND_PROBE_PREPARED": "1",
+      "BLEND_PROBE_TILES": "2",
+      "BLEND_PROBE_RECORD": "1",
+      "BLEND_PROBE_PRESTROKE": "6",
+      "BLEND_PROBE_TILE_CUT": "1024"
+    },
+    "cpu_ms": 0.157,
+    "round_min_ms": 0.155,
+    "round_max_ms": 0.159,
+    "reference_sha256": "b54bd64eedc9720f04abe64a71222e78f619dca465fbdb495c59109bdf1ff577"
+  },
+  "spoorkaart_prorail_april_2013.pdf": {
+    "name": "record-packed-bands2",
+    "mask": "0-15",
+    "queue_per_context": 16384,
+    "env": {
+      "BLEND_PROBE_PREPARED": "1",
+      "BLEND_PROBE_TILES": "2",
+      "BLEND_PROBE_RECORD": "1",
+      "BLEND_PROBE_PRESTROKE": "6",
+      "BLEND_PROBE_TILE_CUT": "1024"
+    },
+    "cpu_ms": 15.379,
+    "round_min_ms": 15.001,
+    "round_max_ms": 15.809,
+    "reference_sha256": "2b6d323375d76edc89a94ac3109693bb80dc16606aa7c07214e0a3f5e504db25"
+  },
+  "tiger.svg": {
+    "name": "record-packed-one",
+    "mask": "0-15",
+    "queue_per_context": 32768,
+    "env": {
+      "BLEND_PROBE_PREPARED": "1",
+      "BLEND_PROBE_RECORD": "1",
+      "BLEND_PROBE_PRESTROKE": "6"
+    },
+    "cpu_ms": 0.368,
+    "round_min_ms": 0.335,
+    "round_max_ms": 0.558,
+    "reference_sha256": "3fabe3ee8b2710e5a9e26489d779337514b11f0f19590462c2a7871aee3d5841"
+  }
+}

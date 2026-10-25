@@ -1,0 +1,37 @@
+Optimized Blend2D 16T CPU versus Rasterizer hardware GPU
+Updated: 2026-10-25T06:35:08.956503+01:00
+Status: COMPLETE — HISTORICAL GPU VALUES
+SEPARATE RUNS: newly measured CPU16T calibration versus saved Radeon results from 2026-10-24. GPU was not rerun; this is not a fresh paired benchmark. CPU calibration: 3 fresh processes, 5 warmups + 10 measured frames each, same 16 physical cores. Saved GPU run had unrestricted CPU affinity; fresh paired mode pins both to 0-15.
+
+2048x2048 full redraw of an already loaded, unchanged document. Times are milliseconds; lower is better.
+CPU: 16 total rendering threads, pinned to logical CPUs 0-15 (16 physical cores on this host).
+CPU plan chosen per document from four measured 16T configurations; this is per-document tuning, not an automatic general policy.
+CPU retains exact stroke outlines where enabled, and resolved command/state batches; regenerates raster edges and rerenders every pixel.
+CPU parsing/retained preparation and first command capture are outside redraw timing. Added preparation/RAM is recorded in the earlier campaign.
+GPU frame timing includes FrameWriter CPU preparation with 16 threads, upload, submission and GPU completion wait. It is not isolated GPU time.
+Pixel readback/PNG encoding are outside both timers. Four unsupported original documents remain excluded.
+
+Document | CPU16T optimized | Rasterizer GPU | faster backend | CPU plan
+6000-DRG-01-M-001.pdf | 24.412 | 15.947 | GPU 1.53x | record-packed-bands2
+Anime_Girl.svg | 1.632 | 0.793 | GPU 2.06x | record-packed-bands2
+AntigenicShift_HiRes.svg | 1.270 | 0.939 | GPU 1.35x | record-packed-bands4
+Manchester_Union_Democrat_office_1877.svg | 5.686 | 2.629 | GPU 2.16x | record-packed-bands2
+PToT_hi-res_source_nobackground.svg | 0.941 | 0.660 | GPU 1.43x | record-packed-bands2
+Paris 30K.pdf | 6.731 | 5.080 | GPU 1.33x | record-packed-bands2
+car.pdf | 3.912 | 1.159 | GPU 3.37x | record-one
+contour.svg | 2.501 | 1.971 | GPU 1.27x | record-packed-bands4
+designcloud.pdf | 7.911 | 4.413 | GPU 1.79x | record-packed-bands2
+drops.pdf | 3.510 | 0.615 | GPU 5.71x | record-packed-bands2
+embrace.pdf | 3.685 | 0.689 | GPU 5.35x | record-packed-bands2
+hawaii.svg | 1.206 | 1.525 | CPU 1.26x | record-packed-bands2
+pathological.pdf | 25.812 | 13.077 | GPU 1.97x | record-packed-bands2
+reschart.svg | 0.157 | 0.341 | CPU 2.17x | record-packed-bands2
+spoorkaart_prorail_april_2013.pdf | 15.379 | 8.096 | GPU 1.90x | record-packed-bands2
+tiger.svg | 0.368 | 0.631 | CPU 1.72x | record-packed-one
+
+Completed: 16 documents; CPU faster: 3, GPU faster: 13.
+Geometric mean CPU/GPU time ratio: 1.658x. Ratios>1 favor GPU.
+
+Raw outputs/metadata: <original-workspace>/rasterizer-wgpu/out/blend16-vs-gpu-historical
+Plan definitions: <original-workspace>/rasterizer-wgpu/out/blend16-vs-gpu-historical/plans.json
+Cross-renderer AA/join differences are expected; CPU validation uses original Blend2D pixel references, not an assertion that both renderers are pixel-identical.

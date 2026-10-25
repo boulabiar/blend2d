@@ -1,0 +1,17 @@
+document,status,cpu_ms,gpu_ms,cpu_over_gpu,plan,pixel_match,round_min_ms,round_max_ms
+6000-DRG-01-M-001.pdf,complete,24.412,15.9470995,1.530811292674257,record-packed-bands2,True,24.341,24.564
+Anime_Girl.svg,complete,1.632,0.7926150000000001,2.0590072103101753,record-packed-bands2,True,1.624,1.673
+AntigenicShift_HiRes.svg,complete,1.27,0.939389,1.351942592472341,record-packed-bands4,True,1.254,1.274
+Manchester_Union_Democrat_office_1877.svg,complete,5.686,2.6287455,2.163008933348626,record-packed-bands2,True,4.451,5.985
+PToT_hi-res_source_nobackground.svg,complete,0.941,0.6595599999999999,1.426708714900843,record-packed-bands2,True,0.939,0.945
+Paris 30K.pdf,complete,6.731,5.079952499999999,1.3250123893874994,record-packed-bands2,True,6.631,6.781
+car.pdf,complete,3.912,1.159236,3.3746363984555345,record-one,True,3.664,5.956
+contour.svg,complete,2.501,1.9709305000000001,1.2689437806152981,record-packed-bands4,True,2.487,2.518
+designcloud.pdf,complete,7.911,4.413142499999999,1.7926001709666073,record-packed-bands2,True,7.852,7.921
+drops.pdf,complete,3.51,0.6146415000000001,5.710645961914383,record-packed-bands2,True,3.481,3.603
+embrace.pdf,complete,3.685,0.688639,5.351134629319571,record-packed-bands2,True,3.65,3.762
+hawaii.svg,complete,1.206,1.525037,0.7908004854964175,record-packed-bands2,True,1.173,1.217
+pathological.pdf,complete,25.812,13.0771285,1.9738278170165569,record-packed-bands2,True,25.717,26.945
+reschart.svg,complete,0.157,0.341122,0.46024589443073155,record-packed-bands2,True,0.155,0.159
+spoorkaart_prorail_april_2013.pdf,complete,15.379,8.096477,1.8994681266926343,record-packed-bands2,True,15.001,15.809
+tiger.svg,complete,0.368,0.6313960000000001,0.582835494681626,record-packed-one,True,0.335,0.558

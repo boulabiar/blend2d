@@ -1,0 +1,10 @@
+Blend2D Unit Tests [use --help for command line options]
+  Version    : 0.21.3
+  Build Type : Release
+  Compiled By: Clang 18.1
+
+[[Priority=6]]
+Running var_exact_type_predicates
+
+Success:
+  All tests passed!

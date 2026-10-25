@@ -1,0 +1,78 @@
+{
+  "binary": "out/optimization-campaign/bin/ra-blend-thread-probe-partition",
+  "binary_sha256": "4616ac8def5c69908faf3b44d55aed0639a0b7aa69dd10c8692d57ef799a5a40",
+  "alternative_binaries": {
+    "out/optimization-campaign/bin/ra-blend-thread-probe-partition": "4616ac8def5c69908faf3b44d55aed0639a0b7aa69dd10c8692d57ef799a5a40"
+  },
+  "phase": "cpu16",
+  "repeats": 3,
+  "plans": [
+    {
+      "name": "record-one",
+      "mask": "0-15",
+      "prepared": true,
+      "tiles": 0,
+      "queue": 32768,
+      "threads": 16,
+      "extra": {
+        "BLEND_PROBE_RECORD": "1",
+        "BLEND_PROBE_PRESTROKE": "0"
+      }
+    },
+    {
+      "name": "record-packed-one",
+      "mask": "0-15",
+      "prepared": true,
+      "tiles": 0,
+      "queue": 32768,
+      "threads": 16,
+      "extra": {
+        "BLEND_PROBE_RECORD": "1",
+        "BLEND_PROBE_PRESTROKE": "6"
+      }
+    },
+    {
+      "name": "record-packed-bands2",
+      "mask": "0-15",
+      "prepared": true,
+      "tiles": 2,
+      "queue": 16384,
+      "threads": 16,
+      "extra": {
+        "BLEND_PROBE_RECORD": "1",
+        "BLEND_PROBE_PRESTROKE": "6",
+        "BLEND_PROBE_TILE_CUT": "calibrated"
+      }
+    },
+    {
+      "name": "record-packed-bands4",
+      "mask": "0-15",
+      "prepared": true,
+      "tiles": 4,
+      "queue": 8192,
+      "threads": 16,
+      "extra": {
+        "BLEND_PROBE_RECORD": "1",
+        "BLEND_PROBE_PRESTROKE": "6"
+      }
+    }
+  ],
+  "documents": [
+    "6000-DRG-01-M-001.pdf",
+    "Anime_Girl.svg",
+    "AntigenicShift_HiRes.svg",
+    "Manchester_Union_Democrat_office_1877.svg",
+    "PToT_hi-res_source_nobackground.svg",
+    "Paris 30K.pdf",
+    "car.pdf",
+    "contour.svg",
+    "designcloud.pdf",
+    "drops.pdf",
+    "embrace.pdf",
+    "hawaii.svg",
+    "pathological.pdf",
+    "reschart.svg",
+    "spoorkaart_prorail_april_2013.pdf",
+    "tiger.svg"
+  ]
+}

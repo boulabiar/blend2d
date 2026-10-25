@@ -1,0 +1,113 @@
+Blend2D retained-redraw review branch
+
+Branch: review/retained-redraw-16t
+Base: 58ca9460b4138af6e793184682e9324e0a8053b2 (Blend2D v0.21.3)
+
+This branch contains Blend2D library changes plus optional native review fixtures.
+There are no changes to Rasterizer or the rasterizer-wgpu application in this
+branch. The original Blend2D checkout used for benchmarks was left untouched.
+
+The large redraw gains come from a COMBINATION of library changes and caller-side
+retained preparation/worker ownership. This is not a claim that rebuilding the
+ordinary public-API application against this branch automatically yields all of
+the published gains. The relevant caller code is included in the native fixture.
+
+Review the commits in order (short hashes below identify the core changes):
+ 1. bd5e3bc275 Fix exact raw object type checks
+ 2. 5a364598d0 Amortize geometry job claims in large batches
+ 3. 825fbb1c5b Stop analytic commands after their bottom coverage bound
+ 4. f82e5b0e94 Prepare large multi-contour fills across geometry workers
+ 5. aca8fbea63 experiment: restrict a context to an owned raster band range
+ 6. bb7f9d508c experiment: expose the small-path asynchronous cutoff
+ 7. 4b795daa78 experiment: generate edges from retained exact stroke outlines
+ 8. dc615555de experiment: borrow immutable source paths through a flush
+ 9. c1f94bd958 experiment: replay retained command batches with fresh geometry
+10. Optional native fixtures, validation logs and documented16T measurements.
+
+Commits 1-4 are the general correctness/performance candidates. The type predicate
+fix in commit 1 is independent and includes an upstream-style regression test.
+The batching/bounds/contour-splitting commits are separate for review in order.
+Commits 5-9 are explicitly experimental private hooks, NOT proposed stable APIs.
+The final fixture/documentation commit can be omitted when reviewing core changes.
+
+Where the major optimizations live:
+- Library: grouped job claims, conservative bottom coverage bounds, parallel
+  large filled-path preparation, and private band-range/outline/borrow/replay hooks.
+- Caller fixture: persistent contexts with isolated L3-local worker pools,
+  conservative draw filtering, per-document row boundaries, stroke construction
+  during load, and a retained stream of drawing-state updates.
+- Row ownership changes raster writes, not source coordinates or geometry clipping.
+  Intersecting the geometry clip with a stripe changed pixels and was rejected.
+- Stroke caches preserve exact A/B/C native stroke-sink output. Every redraw still
+  transforms/builds fresh raster edges and rasterizes/composites all pixels.
+- Command recording captures state/commands on first render. It retains no finished
+  image or prior-frame raster edge data. The capture cost belongs to preparation.
+
+The scope of the experimental head is a static-library research prototype. Private
+hooks assume asynchronous raster contexts and immutable retained data, expose no
+stable public ABI, and need API/lifetime/allocation integration before production
+use. In particular, command-tape allocation currently uses C++ new/delete; the head
+has not been qualified for the project's no-C++-stdlib shared-library contract.
+The ordinary public API does not enable the outline/borrow/tape/band hooks, and the
+small-path cutoff retains its original default 10 unless explicitly overridden.
+
+Validate without Rasterizer, Rust, a GPU, or document downloads:
+  cmake -S . -B build-review -DCMAKE_BUILD_TYPE=Release \
+    -DBLEND2D_STATIC=ON -DBLEND2D_EXPERIMENTAL_REDRAW=ON \
+    -DASMJIT_DIR=/path/to/asmjit -DCMAKE_CXX_COMPILER=clang++
+  cmake --build build-review --parallel 8 --target \
+    bl_review_equivalence bl_review_split_fill bl_review_render bl_review_type_predicates
+  ctest --test-dir build-review -R '^bl_review_' --output-on-failure
+The exact AsmJit revision used was 0464e1c8f1f43c861a0c73d4e59437fff255cdd9.
+The fixture option is OFF by default and requires a POSIX host and static linking.
+
+The official type-predicate test is also in blend2d/core/var_test.cpp. With the
+normal BLEND2D_TEST=ON setup, build bl_test_runner and run:
+  build-review/bl_test_runner --run-var_exact_type_predicates
+  build-review/bl_test_runner '--run-var*'
+The first command fails before the one-line object-type fix and passes afterward.
+
+Recorded validation (this branch checkout, Release, Clang 18.1.8):
+- Syntax checks passed after EVERY core commit, not only after the final state.
+- Fresh CMake static build from this checkout completed.
+- All four optional CTest fixtures passed: replay/retained state, giant contour
+  fills, general rendering and expanded type predicates.
+- The replay fixture checks 25 variants x 4 resolutions x 2 seeds, two redraws each;
+  gradients, patterns, strokes, transforms, fractional clips, band alignment,
+  off-center boundaries and narrow final bands are covered.
+- General rendering compares 324,000 draws; type matrix checks 168 predicates.
+- The official var tests pass against the newly built library.
+- All benchmarked core files match the prior validated candidate byte-for-byte;
+  the only additional core test change is the new var predicate regression.
+- Earlier full-candidate ASan/UBSan validation passed; those checks are not claimed
+  to have been rerun in this checkout. LeakSanitizer was unavailable in the sandbox.
+No performance benchmarks were rerun while arranging these commits.
+
+See blend2d-testing/experimental-redraw/results/ for measurements and validation.
+The latest 16T data comprises 16 documents x 4 configurations x 3 fresh processes,
+with 5 warmups and 10 measured redraws/process. CPU 16T uses CPUs 0-15 (16 physical
+cores on the test Ryzen AI Max+395). All 192 processes match original Blend2D
+reference pixels; raw 1920 frame samples and the selected per-document plans are
+included. The best of four measured configurations is per-document calibration,
+not an implemented general-purpose automatic selection algorithm.
+
+The GPU column uses the saved Radeon host run from 2026-10-24. It includes 16-thread
+CPU preparation, upload, submission and GPU completion. It was NOT rerun alongside
+the latest CPU data and had unrestricted CPU affinity. Report it as a historical
+comparison, not a fresh paired result. Four unsupported source documents are
+excluded. Different renderers need not have identical antialiasing/join semantics.
+
+Parsing, retained stroke/command preparation, device/context creation and readback
+are excluded from redraw timing. First tape capture is charged to retained load
+preparation. The original baseline first-render/JIT is in untimed warmups, so the
+load/retained metric is not time to first visible image. Retained caches add load
+and RAM costs; geometry/style/viewport changes require rebuilding the retained data.
+
+Document import, original PDF/SVG files and the full external GPU application are
+not bundled. This native harness reproduces the library/caller logic and correctness
+checks independently; rerunning the document performance comparison additionally
+requires those original inputs and the separate benchmark application.
+
+The first commit's minimal regression can be shared independently of the redraw
+experiments. Start review there, then examine the general changes and experimental
+APIs separately. No upstream issue, message or pull request has been sent.

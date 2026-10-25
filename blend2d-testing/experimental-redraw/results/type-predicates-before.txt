@@ -1,0 +1,9 @@
+Blend2D Unit Tests [use --help for command line options]
+  Version    : 0.21.3
+  Build Type : Release
+  Compiled By: Clang 18.1
+
+[[Priority=6]]
+Running var_exact_type_predicates
+  FAILED: EXPECT_EQ(value.is_rgba32(), value.type() == BL_OBJECT_TYPE_RGBA32)
+  SOURCE: <review-checkout>/blend2d/core/var_test.cpp (Line: 42)

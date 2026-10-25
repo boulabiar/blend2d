@@ -1,0 +1,21 @@
+Blend2D Unit Tests [use --help for command line options]
+  Version    : 0.21.3
+  Build Type : Release
+  Compiled By: Clang 18.1
+
+[[Priority=6]]
+Running var_basic_types
+  Verifying null value functionality
+  Verifying bool value functionality
+  Verifying int/uint value functionality
+  Verifying float/double value functionality
+  Checking bool/int/uint/double value conversions
+Running var_exact_type_predicates
+Running var_styles
+  Verifying BLRgba[32|64] value functionality
+  Checking BLRgba[32|64] value conversions
+  Checking BLGradient value functionality
+  Checking BLPattern value functionality
+
+Success:
+  All tests passed!
