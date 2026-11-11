@@ -121,6 +121,7 @@ BLResult WorkerManager::init(RasterContextImpl* ctx_impl, const BLContextCreateI
     _thread_count = 0;
   }
 
+  _probe_async_path_limit = BL_RASTER_CONTEXT_MINIMUM_ASYNC_PATH_BYTE_SIZE;
   _probe_band_first = 0;
   _probe_band_last = UINT32_MAX;
   _is_active = true;

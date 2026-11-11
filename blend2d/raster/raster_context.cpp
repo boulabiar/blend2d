@@ -2970,7 +2970,7 @@ BL_INLINE BLResult fill_unclipped_path_with_origin<kAsync>(
     RasterContextImpl* ctx_impl, DispatchInfo di, DispatchStyle ds,
     const BLPoint& origin_fixed, const BLPath& path, BLFillRule fill_rule) noexcept {
 
-  if (path.byte_size() <= BL_RASTER_CONTEXT_MINIMUM_ASYNC_PATH_BYTE_SIZE) {
+  if (path.byte_size() <= ctx_impl->worker_mgr()._probe_async_path_limit) {
     const BLMatrix2D& ft = ctx_impl->final_transform_fixed();
     BLMatrix2D transform(ft.m00, ft.m01, ft.m10, ft.m11, origin_fixed.x, origin_fixed.y);
 
@@ -3184,7 +3184,7 @@ BLResult BL_NOINLINE fill_unclipped_geometry<kAsync>(RasterContextImpl* ctx_impl
 
     case BL_GEOMETRY_TYPE_PATH_D: {
       const BLPath* path = static_cast<const BLPath*>(data);
-      if (path->byte_size() <= BL_RASTER_CONTEXT_MINIMUM_ASYNC_PATH_BYTE_SIZE) {
+      if (path->byte_size() <= ctx_impl->worker_mgr()._probe_async_path_limit) {
         return fill_unclipped_path<kAsync>(ctx_impl, di, ds, *path, fill_rule);
       }
 
@@ -4857,5 +4857,13 @@ extern "C" BLResult bl_probe_set_band_range(BLContextCore* self, uint32_t y0, ui
 
   ctx->worker_mgr()._probe_band_first = y0 / band;
   ctx->worker_mgr()._probe_band_last = (y1 + band - 1) / band;
+  return BL_SUCCESS;
+}
+
+extern "C" BLResult bl_probe_set_async_path_limit(BLContextCore* self, uint32_t byte_limit) noexcept {
+  auto* ctx = probe_async_context(self);
+  if (!ctx || ctx->worker_mgr().has_pending_commands())
+    return BL_ERROR_INVALID_STATE;
+  ctx->worker_mgr()._probe_async_path_limit = byte_limit;
   return BL_SUCCESS;
 }
