@@ -30,4 +30,7 @@ struct ProbePackedView {
 extern "C" BLResult bl_probe_stroke_packed(BLContextCore* self, const bl::RasterEngine::ProbePackedView* view,
                                           uint32_t first, uint32_t count, const BLObjectCore* style) noexcept;
 
+extern "C" BLResult bl_probe_geometry_borrowed(BLContextCore* self, const BLPathCore* path,
+                                               uint32_t stroke, const BLObjectCore* style) noexcept;
+
 #endif // BLEND2D_RASTER_PROBE_REDRAW_P_H_INCLUDED

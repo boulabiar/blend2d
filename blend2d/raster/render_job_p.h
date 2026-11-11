@@ -41,7 +41,8 @@ enum class RenderJobFlags : uint8_t {
 
   kComputePendingFetchData = 0x01u,
   kSplitFill = 0x02u,
-  kPackedStroke = 0x08u
+  kPackedStroke = 0x08u,
+  kBorrowedPath = 0x10u
 };
 BL_DEFINE_ENUM_FLAGS(RenderJobFlags)
 

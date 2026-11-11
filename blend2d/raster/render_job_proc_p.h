@@ -85,14 +85,16 @@ static BL_INLINE void prepare_edge_builder(WorkData* work_data, const SharedFill
   work_data->edge_builder.set_flatten_tolerance_sq(Math::square(fill_state->tolerance_fixed_d));
 }
 
-static BL_INLINE BLPath* get_geometry_as_path(WorkData* work_data, RenderJob_GeometryOp* job) noexcept {
-  BLPath* path = nullptr;
+static BL_INLINE const BLPath* get_geometry_as_path(WorkData* work_data, RenderJob_GeometryOp* job) noexcept {
   BLGeometryType geometry_type = job->geometry_type();
+
+  if (job->has_job_flag(RenderJobFlags::kBorrowedPath))
+    return &(*job->geometry_data<const BLPathCore*>())->dcast();
 
   if (geometry_type == BL_GEOMETRY_TYPE_PATH_D)
     return job->geometry_data<BLPath>();
 
-  path = &work_data->tmp_path[3];
+  BLPath* path = &work_data->tmp_path[3];
   path->clear();
   BLResult result = path->add_geometry(geometry_type, job->geometry_data<void>());
 
@@ -106,7 +108,7 @@ static BL_INLINE BLPath* get_geometry_as_path(WorkData* work_data, RenderJob_Geo
 
 static BL_INLINE void finalize_geometry_data(WorkData* work_data, RenderJob_GeometryOp* job) noexcept {
   axl::maybe_unused(work_data);
-  if (job->geometry_type() == BL_GEOMETRY_TYPE_PATH_D)
+  if (job->geometry_type() == BL_GEOMETRY_TYPE_PATH_D && !job->has_job_flag(RenderJobFlags::kBorrowedPath))
     job->geometry_data<BLPath>()->~BLPath();
 }
 
@@ -209,7 +211,7 @@ static void process_fill_geometry_job(WorkData* work_data, RenderJob_GeometryOp*
     return;
   }
 
-  BLPath* path = get_geometry_as_path(work_data, job);
+  const BLPath* path = get_geometry_as_path(work_data, job);
   if (BL_UNLIKELY(!path))
     return;
 
@@ -281,7 +283,7 @@ static void process_fill_text_job(WorkData* work_data, RenderJob_TextOp* job) no
 // ==================================================
 
 static void process_stroke_geometry_job(WorkData* work_data, RenderJob_GeometryOp* job) noexcept {
-  BLPath* path = get_geometry_as_path(work_data, job);
+  const BLPath* path = get_geometry_as_path(work_data, job);
   if (BL_UNLIKELY(!path))
     return;
 
