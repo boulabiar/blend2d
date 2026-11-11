@@ -111,6 +111,50 @@ static std::vector<unsigned char> test_render(int size, unsigned seed, Variant v
   bb_free(bench);
   return first;
 }
+// A batch that cannot be recorded must still render every draw call, including
+// the one that fills the queue. Only bl_probe_record_end() reports the failure.
+static void test_unrecordable_batch() {
+  auto draw = [](BLContext &context) {
+    check(context.clear_all());
+    for (int i = 0; i < 700; i++) {
+      double x = (i % 30) * 8.0 + 1.3, y = (i / 30) * 8.0 + 0.7;
+      BLPath path;
+      for (int k = 0; k < 6; k++) {
+        path.move_to(x + k, y);
+        path.line_to(x + k + 0.6, y + 1.5);
+        path.line_to(x + k + 0.2, y + 6.5);
+        path.close();
+      }
+      check(context.fill_path(path, BLRgba32(0xFF000000u | (unsigned(i) * 2654435761u >> 8))));
+    }
+  };
+  BLContextCreateInfo info{};
+  info.thread_count = 4;
+  info.command_queue_limit = 256;
+  BLImage expected(256, 256, BL_FORMAT_PRGB32), actual(256, 256, BL_FORMAT_PRGB32);
+  {
+    BLContext context(expected, info);
+    draw(context);
+    check(context.end());
+  }
+  BLContext context(actual, info);
+  check(bl_probe_record_begin(&context));
+  // Inline analytic edges cannot be replayed.
+  check(bl_probe_set_async_path_limit(&context, 1u << 20));
+  draw(context);
+  check(context.flush(BL_CONTEXT_FLUSH_SYNC));
+  if (bl_probe_record_end(&context) != BL_ERROR_NOT_IMPLEMENTED ||
+      bl_probe_record_replay(&context) != BL_ERROR_NOT_IMPLEMENTED)
+    std::abort();
+  check(context.end());
+  BLImageData a, b;
+  check(expected.get_data(&a));
+  check(actual.get_data(&b));
+  if (std::memcmp(a.pixel_data, b.pixel_data, size_t(a.stride) * size_t(a.size.h)) != 0) {
+    std::fprintf(stderr, "Unrecordable batch changed pixels\n");
+    std::abort();
+  }
+}
 int main(int argc, char** argv) {
   Variant reference = {"sync", 0, 0, 0, -1, false};
   if (argc == 2 && std::strcmp(argv[1], "--lifetime") == 0) {
@@ -147,6 +191,7 @@ int main(int argc, char** argv) {
                         {"record-packed", 16, 0, 6, -1, true, 0, true},
                         {"record-packed-bands2", 16, 2, 6, -1, true, 0, true},
                         {"record-packed-cut", 16, 2, 6, -1, true, 0, true, 1280}};
+  test_unrecordable_batch();
   for (int size : {128, 257, 321, 2048})
     for (unsigned seed : {1u, 987654321u}) {
       auto image = test_render(size, seed, reference);

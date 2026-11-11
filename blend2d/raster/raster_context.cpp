@@ -1189,13 +1189,13 @@ static BL_INLINE void run_render_batch(RasterContextImpl* ctx_impl, WorkerManage
 
 static BL_NOINLINE BLResult flush_render_batch(RasterContextImpl* ctx_impl) noexcept {
   WorkerManager& mgr = ctx_impl->worker_mgr();
-  BLResult result = BL_SUCCESS;
   if (mgr.has_pending_commands()) {
     ProbeRecordedFrame* frame = mgr._probe_record;
     ProbeRecordedBatch* recording = nullptr;
+    // A batch that cannot be recorded is still rendered. The failure is reported
+    // by bl_probe_record_end() and must not fail the draw call that filled the queue.
     if (frame && frame->capturing && frame->error == BL_SUCCESS) {
-      result = prepare_recorded_batch(mgr, &recording);
-      frame->error = result;
+      frame->error = prepare_recorded_batch(mgr, &recording);
     }
 
     mgr.finalize_batch();
@@ -1229,7 +1229,7 @@ static BL_NOINLINE BLResult flush_render_batch(RasterContextImpl* ctx_impl) noex
     ctx_impl->shared_stroke_state = nullptr;
   }
 
-  return result;
+  return BL_SUCCESS;
 }
 
 // RasterEngine - ContextImpl - Internals - Render Call - Data Allocation
