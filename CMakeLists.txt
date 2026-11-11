@@ -435,6 +435,7 @@ set(BLEND2D_SRC_LIST
   blend2d/raster/render_command_proc_sync_p.h
   blend2d/raster/render_fetch_data.cpp
   blend2d/raster/render_fetch_data_p.h
+  blend2d/raster/probe_redraw_p.h
   blend2d/raster/render_job_p.h
   blend2d/raster/render_job_proc_p.h
   blend2d/raster/render_queue_p.h
@@ -1342,6 +1343,12 @@ if (BLEND2D_DEMOS)
   target_link_directories(bl_bench_context PRIVATE ${BLEND2D_BENCH_LIBRARY_DIRS})
 else()
   message(STATUS "[blend2d] Disabling Blend2D demos ('BLEND2D_DEMOS=OFF')")
+endif()
+
+option(BLEND2D_EXPERIMENTAL_REDRAW_TEST "Build the fixed-document redraw review fixtures" OFF)
+if (BLEND2D_EXPERIMENTAL_REDRAW_TEST)
+  enable_testing()
+  add_subdirectory(blend2d-testing/experimental-redraw)
 endif()
 
 message(STATUS "[blend2d] == Configuring done ==")
