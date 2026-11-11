@@ -4835,3 +4835,27 @@ void bl_raster_context_on_init([[maybe_unused]] BLRuntimeContext* rt) noexcept {
   RasterEngine::init_virt<RasterEngine::RenderingMode::kSync>(&RasterEngine::raster_impl_virt_sync);
   RasterEngine::init_virt<RasterEngine::RenderingMode::kAsync>(&RasterEngine::raster_impl_virt_async);
 }
+
+static bl::RasterEngine::RasterContextImpl* probe_async_context(BLContextCore* self) noexcept {
+  if (!self || self->dcast().context_type() != BL_CONTEXT_TYPE_RASTER)
+    return nullptr;
+  auto* ctx = self->_d.impl<bl::RasterEngine::RasterContextImpl>();
+  return ctx->is_sync() ? nullptr : ctx;
+}
+
+// Benchmark hook for a fresh asynchronous context. Limit writes while
+// preserving the full geometry clip and original analytic edge coverage.
+extern "C" BLResult bl_probe_set_band_range(BLContextCore* self, uint32_t y0, uint32_t y1) noexcept {
+  auto* ctx = probe_async_context(self);
+  if (!ctx || ctx->worker_mgr().has_pending_commands())
+    return BL_ERROR_INVALID_STATE;
+
+  uint32_t height = uint32_t(ctx->dst_data.size.h);
+  uint32_t band = ctx->band_height();
+  if (y0 > y1 || y1 > height || y0 % band || (y1 != height && y1 % band))
+    return BL_ERROR_INVALID_VALUE;
+
+  ctx->worker_mgr()._probe_band_first = y0 / band;
+  ctx->worker_mgr()._probe_band_last = (y1 + band - 1) / band;
+  return BL_SUCCESS;
+}

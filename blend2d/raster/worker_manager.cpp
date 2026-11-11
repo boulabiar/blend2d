@@ -121,6 +121,8 @@ BLResult WorkerManager::init(RasterContextImpl* ctx_impl, const BLContextCreateI
     _thread_count = 0;
   }
 
+  _probe_band_first = 0;
+  _probe_band_last = UINT32_MAX;
   _is_active = true;
   _band_count = ctx_impl->band_count();
   _command_queue_limit = command_queue_limit;
