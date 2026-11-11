@@ -159,6 +159,8 @@ struct PreallocatedBytePool {
   //! \}
 };
 
+struct ProbeRecordedFrame;
+
 class WorkerManager {
 public:
   BL_NONCOPYABLE(WorkerManager)
@@ -198,6 +200,7 @@ public:
   uint32_t _thread_count;
   //! Number of bands,
   uint32_t _band_count;
+  ProbeRecordedFrame* _probe_record = nullptr;
   uint32_t _probe_async_path_limit = 0;
   uint32_t _probe_band_first = 0;
   uint32_t _probe_band_last = UINT32_MAX;

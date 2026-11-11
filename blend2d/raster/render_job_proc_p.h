@@ -108,7 +108,7 @@ static BL_INLINE const BLPath* get_geometry_as_path(WorkData* work_data, RenderJ
 
 static BL_INLINE void finalize_geometry_data(WorkData* work_data, RenderJob_GeometryOp* job) noexcept {
   axl::maybe_unused(work_data);
-  if (job->geometry_type() == BL_GEOMETRY_TYPE_PATH_D && !job->has_job_flag(RenderJobFlags::kBorrowedPath))
+  if (job->geometry_type() == BL_GEOMETRY_TYPE_PATH_D && !job->has_job_flag(RenderJobFlags::kBorrowedPath | RenderJobFlags::kRecordedJob))
     job->geometry_data<BLPath>()->~BLPath();
 }
 
@@ -343,6 +343,10 @@ static void process_stroke_text_job(WorkData* work_data, RenderJob_TextOp* job) 
 // =======================================
 
 static void process_job(WorkData* work_data, RenderJob* job) noexcept {
+  if (job->has_job_flag(RenderJobFlags::kRecordedJob) && !job->has_job_flag(RenderJobFlags::kSplitFill))
+    job->command()._payload.analytic.edges.ptr = nullptr;
+
+
   if (job->has_job_flag(RenderJobFlags::kComputePendingFetchData)) {
     RenderCommand& command = job->command();
     compute_pending_fetch_data(command._source.fetch_data);

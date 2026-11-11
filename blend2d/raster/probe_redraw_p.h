@@ -33,4 +33,10 @@ extern "C" BLResult bl_probe_stroke_packed(BLContextCore* self, const bl::Raster
 extern "C" BLResult bl_probe_geometry_borrowed(BLContextCore* self, const BLPathCore* path,
                                                uint32_t stroke, const BLObjectCore* style) noexcept;
 
+extern "C" BLResult bl_probe_record_begin(BLContextCore* self) noexcept;
+extern "C" BLResult bl_probe_record_end(BLContextCore* self) noexcept;
+extern "C" BLResult bl_probe_record_replay(BLContextCore* self) noexcept;
+extern "C" BLResult bl_probe_set_band_range(BLContextCore* self, uint32_t y0, uint32_t y1) noexcept;
+extern "C" BLResult bl_probe_set_async_path_limit(BLContextCore* self, uint32_t byte_limit) noexcept;
+
 #endif // BLEND2D_RASTER_PROBE_REDRAW_P_H_INCLUDED

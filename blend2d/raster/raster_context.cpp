@@ -5,9 +5,12 @@
 
 #include <blend2d/core/api_build_p.h>
 
+#include <new>
+
 #include <blend2d/axl/bitops_p.h>
 #include <blend2d/axl/bit_set_ops.h>
 #include <blend2d/axl/commons.h>
+#include <blend2d/axl/mem_alloc.h>
 #include <blend2d/axl/string_utils_p.h>
 #include <blend2d/axl/zeroallocator_p.h>
 #include <blend2d/core/compopinfo_p.h>
@@ -1034,48 +1037,189 @@ static BL_INLINE void release_batch_fetch_data(RasterContextImpl* ctx_impl, Rend
   }
 }
 
+struct ProbeRecordedBatch {
+  ArenaAllocator arena{131072, kWorkerAllocatorAlignment};
+  RenderBatch* batch = nullptr;
+  ProbeRecordedBatch* next = nullptr;
+};
+
+struct ProbeRecordedFrame {
+  ProbeRecordedBatch* first = nullptr;
+  ProbeRecordedBatch* last = nullptr;
+  BLResult error = BL_SUCCESS;
+  bool capturing = true;
+};
+
+template<typename Func>
+static void for_each_recorded_job(RenderBatch* batch, const Func& func) noexcept {
+  RenderJobQueue* last = batch->_job_list.last();
+  for (RenderJobQueue* queue = batch->_job_list.first();; queue = queue->next()) {
+    for (RenderJob* job : *queue)
+      func(job);
+    if (queue == last)
+      break;
+  }
+}
+
+static void dispose_recorded_frame(RasterContextImpl* ctx_impl) noexcept {
+  ProbeRecordedFrame* frame = ctx_impl->worker_mgr()._probe_record;
+  ctx_impl->worker_mgr()._probe_record = nullptr;
+  if (!frame)
+    return;
+
+  for (ProbeRecordedBatch* node = frame->first; node;) {
+    ProbeRecordedBatch* next = node->next;
+    release_batch_fetch_data(ctx_impl, node->batch->_command_list.first());
+    for_each_recorded_job(node->batch, [](RenderJob* base) noexcept {
+      auto* job = static_cast<RenderJob_GeometryOp*>(base);
+      if (job->geometry_type() == BL_GEOMETRY_TYPE_PATH_D && !job->has_job_flag(RenderJobFlags::kBorrowedPath))
+        job->geometry_data<BLPath>()->~BLPath();
+    });
+    node->~ProbeRecordedBatch();
+    axl::mem_free(node);
+    node = next;
+  }
+  axl::mem_free(frame);
+}
+
+static BLResult prepare_recorded_batch(WorkerManager& mgr, ProbeRecordedBatch** out) noexcept {
+  RenderBatch* batch = mgr.current_batch();
+  RenderJobQueue* last_job = batch->_job_list.last();
+  for (RenderJobQueue* queue = batch->_job_list.first();; queue = queue->next()) {
+    size_t count = queue == last_job ? mgr._job_appender.index(*queue) : queue->size();
+    for (size_t i = 0; i < count; i++) {
+      RenderJobType type = queue->data()[i]->job_type();
+      if (type != RenderJobType::kFillGeometry && type != RenderJobType::kStrokeGeometry)
+        return BL_ERROR_NOT_IMPLEMENTED;
+    }
+    if (queue == last_job)
+      break;
+  }
+
+  RenderCommandQueue* last_command = batch->_command_list.last();
+  for (RenderCommandQueue* queue = batch->_command_list.first();; queue = queue->next()) {
+    size_t count = queue == last_command ? mgr._command_appender.index() : queue->size();
+    for (size_t i = 0; i < count; i++) {
+      const RenderCommand& command = queue->at(i);
+      // Inline analytic edges belong to a work arena. Only job-generated
+      // analytic edges can be rebuilt from these recorded commands.
+      if (command.is_fill_analytic() && command.analytic_edges())
+        return BL_ERROR_NOT_IMPLEMENTED;
+    }
+    if (queue == last_command)
+      break;
+  }
+
+  void* storage = axl::mem_alloc(sizeof(ProbeRecordedBatch));
+  if (!storage)
+    return BL_ERROR_OUT_OF_MEMORY;
+  auto* node = new (storage) ProbeRecordedBatch();
+  // Reserve the first batch, queues and initial pools before transferring
+  // ownership of the manager's current arena.
+  BLResult result = node->arena.ensure(node->arena.min_block_size());
+  if (result != BL_SUCCESS) {
+    node->~ProbeRecordedBatch();
+    axl::mem_free(node);
+    return result;
+  }
+  *out = node;
+  return BL_SUCCESS;
+}
+
+static void reset_recorded_batch(RenderBatch* batch) noexcept {
+  batch->_job_index = 0;
+  batch->_accumulated_error_flags = 0;
+  if (!batch->_has_split_fill)
+    return;
+
+  for_each_recorded_job(batch, [](RenderJob* base) noexcept {
+    if (!base->has_job_flag(RenderJobFlags::kSplitFill))
+      return;
+    auto* job = static_cast<RenderJob_GeometryOp*>(base);
+    SplitFillRef* ref = job->split_fill_ref();
+    if (ref->index != 0)
+      return;
+
+    SplitFillGroup* group = ref->group;
+    group->remaining = group->part_count;
+    group->failed = 0;
+    memset(group->bands, 0, size_t(group->part_count) * group->band_count * sizeof(EdgeList<int>));
+    for (uint32_t i = 0; i < group->part_count; i++)
+      group->parts[i].bounds.reset(INT_MAX, INT_MAX, INT_MIN, INT_MIN);
+    job->command()._payload.analytic.edges.ptr = nullptr;
+  });
+}
+
+static BL_INLINE void run_render_batch(RasterContextImpl* ctx_impl, WorkerManager& mgr, RenderBatch* batch) noexcept {
+  WorkerSynchronization* synchronization = &mgr._synchronization;
+  uint32_t thread_count = mgr.thread_count();
+
+  for (uint32_t i = 0; i < thread_count; i++) {
+    WorkData* work_data = mgr._work_data_storage[i];
+    work_data->init_batch(batch);
+    work_data->init_context_data(ctx_impl->dst_data, ctx_impl->sync_work_data.ctx_data.pixel_origin);
+  }
+
+  // Just to make sure that all the changes are visible to the threads.
+  synchronization->before_start(thread_count, batch->job_count() > 0);
+
+  for (uint32_t i = 0; i < thread_count; i++) {
+    mgr._worker_threads[i]->run(WorkerProc::worker_thread_entry, mgr._work_data_storage[i]);
+  }
+
+  // User thread acts as a worker too.
+  {
+    synchronization->thread_started();
+
+    WorkData* work_data = &ctx_impl->sync_work_data;
+    SyncWorkState work_state;
+
+    work_state.save(*work_data);
+    WorkerProc::process_work_data(work_data, batch);
+    work_state.restore(*work_data);
+  }
+
+  if (thread_count) {
+    synchronization->wait_for_threads_to_finish();
+    ctx_impl->sync_work_data._accumulated_error_flags |= Atomic::fetch_relaxed(batch->_accumulated_error_flags);
+  }
+
+}
+
 static BL_NOINLINE BLResult flush_render_batch(RasterContextImpl* ctx_impl) noexcept {
   WorkerManager& mgr = ctx_impl->worker_mgr();
+  BLResult result = BL_SUCCESS;
   if (mgr.has_pending_commands()) {
+    ProbeRecordedFrame* frame = mgr._probe_record;
+    ProbeRecordedBatch* recording = nullptr;
+    if (frame && frame->capturing && frame->error == BL_SUCCESS) {
+      result = prepare_recorded_batch(mgr, &recording);
+      frame->error = result;
+    }
+
     mgr.finalize_batch();
-
-    WorkerSynchronization* synchronization = &mgr._synchronization;
     RenderBatch* batch = mgr.current_batch();
-    uint32_t thread_count = mgr.thread_count();
-
-    for (uint32_t i = 0; i < thread_count; i++) {
-      WorkData* work_data = mgr._work_data_storage[i];
-      work_data->init_batch(batch);
-      work_data->init_context_data(ctx_impl->dst_data, ctx_impl->sync_work_data.ctx_data.pixel_origin);
+    if (recording) {
+      for_each_recorded_job(batch, [](RenderJob* job) noexcept {
+        job->add_job_flags(RenderJobFlags::kRecordedJob);
+      });
     }
 
-    // Just to make sure that all the changes are visible to the threads.
-    synchronization->before_start(thread_count, batch->job_count() > 0);
+    run_render_batch(ctx_impl, mgr, batch);
 
-    for (uint32_t i = 0; i < thread_count; i++) {
-      mgr._worker_threads[i]->run(WorkerProc::worker_thread_entry, mgr._work_data_storage[i]);
+    if (recording) {
+      recording->batch = batch;
+      mgr._allocator.swap(recording->arena);
+      if (frame->last)
+        frame->last->next = recording;
+      else
+        frame->first = recording;
+      frame->last = recording;
     }
-
-    // User thread acts as a worker too.
-    {
-      synchronization->thread_started();
-
-      WorkData* work_data = &ctx_impl->sync_work_data;
-      SyncWorkState work_state;
-
-      work_state.save(*work_data);
-      WorkerProc::process_work_data(work_data, batch);
-      work_state.restore(*work_data);
+    else {
+      release_batch_fetch_data(ctx_impl, batch->_command_list.first());
+      mgr._allocator.clear();
     }
-
-    if (thread_count) {
-      synchronization->wait_for_threads_to_finish();
-      ctx_impl->sync_work_data._accumulated_error_flags |= Atomic::fetch_relaxed(batch->_accumulated_error_flags);
-    }
-
-    release_batch_fetch_data(ctx_impl, batch->_command_list.first());
-
-    mgr._allocator.clear();
     mgr.init_first_batch();
 
     ctx_impl->sync_work_data.start_over();
@@ -1084,7 +1228,7 @@ static BL_NOINLINE BLResult flush_render_batch(RasterContextImpl* ctx_impl) noex
     ctx_impl->shared_stroke_state = nullptr;
   }
 
-  return BL_SUCCESS;
+  return result;
 }
 
 // RasterEngine - ContextImpl - Internals - Render Call - Data Allocation
@@ -4617,6 +4761,7 @@ static BLResult detach(BLContextCore* self) noexcept {
 
   // Release Threads/WorkerContexts used by asynchronous rendering.
   if (ctx_impl->worker_mgr_initialized) {
+    dispose_recorded_frame(ctx_impl);
     ctx_impl->worker_mgr->reset();
   }
 
@@ -4946,4 +5091,51 @@ extern "C" BLResult bl_probe_geometry_borrowed(BLContextCore* self, const BLPath
     return BL_SUCCESS;
   return stroke ? bl::RasterEngine::probe_geometry_borrowed<true>(ctx, path, style)
                 : bl::RasterEngine::probe_geometry_borrowed<false>(ctx, path, style);
+}
+
+extern "C" BLResult bl_probe_record_begin(BLContextCore* self) noexcept {
+  auto* ctx = probe_async_context(self);
+  if (!ctx)
+    return BL_ERROR_INVALID_STATE;
+  auto& mgr = ctx->worker_mgr();
+  if (mgr._probe_record || mgr.has_pending_commands())
+    return BL_ERROR_INVALID_STATE;
+
+  void* storage = bl::axl::mem_alloc(sizeof(bl::RasterEngine::ProbeRecordedFrame));
+  if (!storage)
+    return BL_ERROR_OUT_OF_MEMORY;
+  mgr._probe_record = new (storage) bl::RasterEngine::ProbeRecordedFrame();
+  mgr._probe_async_path_limit = 0;
+  return BL_SUCCESS;
+}
+
+extern "C" BLResult bl_probe_record_end(BLContextCore* self) noexcept {
+  auto* ctx = probe_async_context(self);
+  if (!ctx)
+    return BL_ERROR_INVALID_STATE;
+  auto& mgr = ctx->worker_mgr();
+  auto* frame = mgr._probe_record;
+  if (!frame || !frame->capturing || mgr.has_pending_commands())
+    return BL_ERROR_INVALID_STATE;
+
+  frame->capturing = false;
+  return frame->error;
+}
+
+extern "C" BLResult bl_probe_record_replay(BLContextCore* self) noexcept {
+  auto* ctx = probe_async_context(self);
+  if (!ctx)
+    return BL_ERROR_INVALID_STATE;
+  auto& mgr = ctx->worker_mgr();
+  auto* frame = mgr._probe_record;
+  if (!frame || frame->capturing || mgr.has_pending_commands())
+    return BL_ERROR_INVALID_STATE;
+  BL_PROPAGATE(frame->error);
+
+  for (auto* node = frame->first; node; node = node->next) {
+    bl::RasterEngine::reset_recorded_batch(node->batch);
+    bl::RasterEngine::run_render_batch(ctx, mgr, node->batch);
+    ctx->sync_work_data.start_over();
+  }
+  return BL_SUCCESS;
 }
