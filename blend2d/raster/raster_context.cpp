@@ -1128,6 +1128,7 @@ static BLResult prepare_recorded_batch(WorkerManager& mgr, ProbeRecordedBatch** 
 
 static void reset_recorded_batch(RenderBatch* batch) noexcept {
   batch->_job_index = 0;
+  batch->_band_index = 0;
   batch->_accumulated_error_flags = 0;
   if (!batch->_has_split_fill)
     return;

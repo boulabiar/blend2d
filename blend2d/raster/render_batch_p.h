@@ -36,6 +36,9 @@ public:
     //! would only OR their errors (if happened) at the end we can share the
     //! cache line with `_job_index`.
     uint32_t _accumulated_error_flags;
+
+    //! Next unclaimed band (relative to the first owned band).
+    uint32_t _band_index;
   };
 
   //! Contains all jobs of this batch.
@@ -60,6 +63,8 @@ public:
   //! \{
 
   BL_INLINE_NODEBUG size_t next_job_index(size_t count) noexcept { return Atomic::fetch_add_acq_rel(_job_index, count); }
+
+  BL_INLINE_NODEBUG uint32_t next_band_index() noexcept { return Atomic::fetch_add_acq_rel(_band_index, uint32_t(1)); }
 
   BL_INLINE_NODEBUG const ArenaList<RenderJobQueue>& job_list() const noexcept { return _job_list; }
   BL_INLINE_NODEBUG const ArenaList<RenderCommandQueue>& command_list() const noexcept { return _command_list; }

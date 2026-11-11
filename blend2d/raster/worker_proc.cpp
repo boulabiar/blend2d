@@ -275,32 +275,18 @@ static void process_commands(WorkData* work_data, RenderBatch* batch) noexcept {
     return;
   }
 
-  uint32_t worker_count = batch->worker_count();
+  uint32_t band_first = batch->_probe_band_first;
   uint32_t band_count = bl_min(batch->band_count(), batch->_probe_band_last);
 
-  // We can process several consecutive bands at once when there is enough of bands for all the threads.
-  //
-  // TODO: [Rendering Context] At the moment this feature is not used as it regressed `bl_bench_context` using 4+ threads.
-  uint32_t consecutive_band_count = 1;
-
-  uint32_t band_id = batch->_probe_band_first + work_data->worker_id() * consecutive_band_count;
-  uint32_t consecutive_index = 0;
-
-  uint32_t current_band_id = band_id + consecutive_index;
+  // Bands are claimed dynamically. Claims are monotonically increasing per worker,
+  // which is all the per-worker command state requires.
+  uint32_t current_band_id = band_first + batch->next_band_index();
   uint32_t prev_band_id = current_band_id;
 
   while (current_band_id < band_count) {
-    // Calculate the next band so we can pass it to `process_band()`.
-    if (++consecutive_index == consecutive_band_count) {
-      consecutive_index = 0;
-      band_id += worker_count * consecutive_band_count;
-    }
-
-    uint32_t next_band_id = band_id + consecutive_index;
-    process_band(proc_data, current_band_id, prev_band_id, next_band_id);
-
+    process_band(proc_data, current_band_id, prev_band_id, current_band_id + 1);
     prev_band_id = current_band_id;
-    current_band_id = next_band_id;
+    current_band_id = band_first + batch->next_band_index();
   }
 
   work_data->work_zone.restore_state(zone_state);
