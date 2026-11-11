@@ -38,7 +38,8 @@ enum class RenderJobType : uint8_t {
 enum class RenderJobFlags : uint8_t {
   kNone = 0u,
 
-  kComputePendingFetchData = 0x01u
+  kComputePendingFetchData = 0x01u,
+  kSplitFill = 0x02u
 };
 BL_DEFINE_ENUM_FLAGS(RenderJobFlags)
 
@@ -126,6 +127,23 @@ struct RenderJob_BaseOp : public RenderJob {
 };
 
 // The geometry payload follows the job and must satisfy BLPathCore's alignment.
+// Split contours still produce one analytic fill command. Per-part edge lists
+// remain in worker arenas until the batch finishes; only the last producer merges.
+struct SplitFillPart {
+  BLPathPosition begin, end;
+  BLBoxI bounds;
+};
+struct SplitFillGroup {
+  uint32_t remaining, part_count, band_count;
+  uint32_t failed;
+  SplitFillPart* parts;
+  EdgeList<int>* bands;
+};
+struct SplitFillRef {
+  SplitFillGroup* group;
+  uint32_t index;
+};
+
 struct alignas(BLPathCore) RenderJob_GeometryOp : public RenderJob_BaseOp {
   BL_INLINE void init_fill_job(RenderCommandQueue* command_queue, size_t command_index) noexcept {
     _init_internal(RenderJobType::kFillGeometry, command_queue, command_index);
@@ -133,6 +151,10 @@ struct alignas(BLPathCore) RenderJob_GeometryOp : public RenderJob_BaseOp {
 
   BL_INLINE void init_stroke_job(RenderCommandQueue* command_queue, size_t command_index) noexcept {
     _init_internal(RenderJobType::kStrokeGeometry, command_queue, command_index);
+  }
+
+  BL_INLINE_NODEBUG SplitFillRef* split_fill_ref() noexcept {
+    return reinterpret_cast<SplitFillRef*>(geometry_data<uint8_t>() + sizeof(BLPathCore));
   }
 
   BL_INLINE_NODEBUG BLGeometryType geometry_type() const noexcept { return (BLGeometryType)_payload_type; }

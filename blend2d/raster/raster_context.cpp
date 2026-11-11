@@ -2475,6 +2475,109 @@ static BL_INLINE BLResult enqueue_command(
   return BL_SUCCESS;
 }
 
+// Split only at MOVE boundaries: partial edge generation preserves the fill's
+// contour closure, while all edges are combined before the single draw executes.
+static bool try_enqueue_split_fill(WorkerManager& mgr, RenderJob_GeometryOp* source) noexcept {
+  if (source->geometry_type() != BL_GEOMETRY_TYPE_PATH_D || mgr.thread_count() == 0)
+    return false;
+
+  const BLPath* path = source->geometry_data<BLPath>();
+  size_t vertex_count = path->vertex_count();
+  if (vertex_count + path->control_data_size() < 32768)
+    return false;
+
+  uint32_t flags;
+  if (path->get_info_flags(&flags) != BL_SUCCESS || !(flags & BL_PATH_FLAG_MULTIPLE))
+    return false;
+
+  // The legacy path size included a vertex slot for CLOSE. Keep the cutoff
+  // and partition sizes in those same units after dev separated the streams.
+  size_t entry_count = vertex_count;
+  PathIterator scan(path->view());
+  while (scan.has_command()) {
+    BLPathCmd cmd = scan.command();
+    entry_count += size_t(cmd == BL_PATH_CMD_CLOSE);
+    if (cmd == BL_PATH_CMD_CONIC)
+      scan.advance_cmd<BL_PATH_CMD_CONIC>();
+    else
+      scan.advance_non_conic(cmd);
+  }
+  if (entry_count < 32768)
+    return false;
+
+  BLPathPosition starts[65] = {};
+  uint32_t count = 1;
+  uint32_t limit = bl_min<uint32_t>(64, (mgr.thread_count() + 1) * 4);
+  size_t target = bl_max<size_t>(2048, entry_count / limit);
+  size_t entry_offset = 0;
+  size_t last_start = 0;
+  PathIterator it(path->view());
+  while (it.has_command() && count < limit) {
+    BLPathCmd cmd = it.command();
+    if (cmd == BL_PATH_CMD_MOVE) {
+      BLPathPosition position = it.position_from(*path);
+      if (entry_offset - last_start >= target) {
+        starts[count++] = position;
+        last_start = entry_offset;
+      }
+    }
+
+    entry_offset += PathDetail::vertex_count_of_cmd(cmd) + size_t(cmd == BL_PATH_CMD_CLOSE);
+    if (cmd == BL_PATH_CMD_CONIC)
+      it.advance_cmd<BL_PATH_CMD_CONIC>();
+    else
+      it.advance_non_conic(cmd);
+  }
+
+  if (count < 2)
+    return false;
+  starts[count] = {vertex_count, path->control_data_size()};
+
+  size_t band_count = mgr._band_count;
+  size_t group_size = sizeof(SplitFillGroup) + count * sizeof(SplitFillPart) +
+                     count * band_count * sizeof(EdgeList<int>);
+  auto* group = mgr._allocator.alloc_zeroedT<SplitFillGroup>(axl::align_up(group_size, kWorkerAllocatorAlignment), kWorkerAllocatorAlignment);
+  constexpr size_t job_size = axl::align_up(sizeof(RenderJob_GeometryOp) + sizeof(BLPathCore) + sizeof(SplitFillRef), kWorkerAllocatorAlignment);
+  auto* storage = mgr._allocator.alloc_t<uint8_t>(count * job_size, kWorkerAllocatorAlignment);
+  RenderJobQueue* spare = nullptr;
+  bool needs_queue = mgr._job_appender.index(*mgr.current_batch()->_job_list.last()) + count > kRenderQueueCapacity;
+  if (needs_queue)
+    spare = mgr.new_job_queue();
+  // Allocation failure leaves the original job valid; unused arena bytes are
+  // reclaimed with the batch. No path references or queue links changed yet.
+  if (!group || !storage || (needs_queue && !spare))
+    return false;
+  group->remaining = count;
+  group->part_count = count;
+  group->band_count = uint32_t(band_count);
+  group->parts = reinterpret_cast<SplitFillPart*>(group + 1);
+  group->bands = reinterpret_cast<EdgeList<int>*>(group->parts + count);
+
+  for (uint32_t i = 0; i < count; i++) {
+    auto* job = reinterpret_cast<RenderJob_GeometryOp*>(storage + i * job_size);
+    memcpy(job, source, sizeof(RenderJob_GeometryOp));
+    bl_path_init_weak(job->geometry_data<BLPathCore>(), path);
+    job->add_job_flags(RenderJobFlags::kSplitFill);
+    job->split_fill_ref()->group = group;
+    job->split_fill_ref()->index = i;
+    group->parts[i].begin = starts[i];
+    group->parts[i].end = starts[i + 1];
+    group->parts[i].bounds.reset(INT_MAX, INT_MAX, INT_MIN, INT_MIN);
+    if (mgr.is_job_queue_full()) {
+      auto* previous = mgr.current_batch()->_job_list.last();
+      mgr._job_appender.done(*previous);
+      mgr.current_batch()->_job_count += uint32_t(previous->size());
+      mgr.current_batch()->_job_list.append(spare);
+      mgr._job_appender.reset(*spare);
+      spare = nullptr;
+    }
+    mgr.add_job(job);
+  }
+  source->geometry_data<BLPath>()->~BLPath();
+  mgr.current_batch()->_has_split_fill = 1;
+  return true;
+}
+
 template<typename JobType, typename JobFinalizer>
 static BL_INLINE BLResult enqueue_command_with_fill_job(
     RasterContextImpl* ctx_impl, DispatchInfo di, DispatchStyle ds,
@@ -2506,6 +2609,12 @@ static BL_INLINE BLResult enqueue_command_with_fill_job(
     job->set_meta_transform_fixed_type(ctx_impl->meta_transform_fixed_type());
     job->set_final_transform_fixed_type(ctx_impl->final_transform_fixed_type());
     job_finalizer(job);
+    if constexpr (std::is_same_v<JobType, RenderJob_GeometryOp>) {
+      if (try_enqueue_split_fill(mgr, job)) {
+        mark_queue_full_or_exhausted(ctx_impl, mgr._job_appender.full());
+        return;
+      }
+    }
     mgr.add_job(job);
     mark_queue_full_or_exhausted(ctx_impl, mgr._job_appender.full());
   });

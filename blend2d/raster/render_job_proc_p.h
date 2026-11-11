@@ -123,6 +123,50 @@ static BL_INLINE void assign_edges(WorkData* work_data, Job* job, EdgeStorage<in
   }
 }
 
+// Each producer owns its output slot. The final acq/rel decrement observes
+// completed slots and joins edges by band, preserving one fill/winding operation.
+static void finish_split_fill(WorkData* work_data, RenderJob_GeometryOp* job, BLResult result) noexcept {
+  SplitFillRef* ref = job->split_fill_ref();
+  SplitFillGroup* group = ref->group;
+  EdgeStorage<int>& edges = work_data->edge_storage;
+  if (result == BL_SUCCESS && !edges.is_empty()) {
+    group->parts[ref->index].bounds = edges.bounding_box();
+    EdgeList<int>* output = group->bands + size_t(ref->index) * group->band_count;
+    for (uint32_t b = edges.band_start_from_bbox(); b < edges.band_end_from_bbox(); b++) {
+      output[b] = edges.band_edges()[b];
+      edges.band_edges()[b].reset();
+    }
+    edges.reset_bounding_box();
+  }
+  else {
+    edges.clear();
+    if (result != BL_SUCCESS)
+      Atomic::store_relaxed(group->failed, 1u);
+  }
+  if (Atomic::fetch_sub_acq_rel(group->remaining) != 1 || Atomic::fetch_relaxed(group->failed))
+    return;
+
+  BLBoxI bounds(INT_MAX, INT_MAX, INT_MIN, INT_MIN);
+  for (uint32_t p = 0; p < group->part_count; p++) {
+    const BLBoxI& box = group->parts[p].bounds;
+    bounds.x0 = bl_min(bounds.x0, box.x0); bounds.y0 = bl_min(bounds.y0, box.y0);
+    bounds.x1 = bl_max(bounds.x1, box.x1); bounds.y1 = bl_max(bounds.y1, box.y1);
+  }
+  if (bounds.y0 == INT_MAX)
+    return;
+  edges._bounding_box = bounds;
+  for (uint32_t b = edges.band_start_from_bbox(); b < edges.band_end_from_bbox(); b++) {
+    EdgeList<int>& output = edges.band_edges()[b];
+    for (uint32_t p = 0; p < group->part_count; p++) {
+      EdgeList<int>& part = group->bands[size_t(p) * group->band_count + b];
+      if (part.is_empty()) continue;
+      if (output.is_empty()) output = part;
+      else { output._last->next = part.first(); output._last = part.last(); }
+    }
+  }
+  assign_edges(work_data, job, &edges);
+}
+
 // RasterEngine - Job Processor - Fill Geometry Job
 // ================================================
 
@@ -133,11 +177,22 @@ static void process_fill_geometry_job(WorkData* work_data, RenderJob_GeometryOp*
 
   JobStateAccessor accessor(job);
   prepare_edge_builder(work_data, accessor.fill_state());
-  BLResult result = add_filled_path_edges(work_data, path->view(), accessor.final_transform_fixed(job->origin_fixed()), accessor.final_transform_fixed_type());
-
-  if (result == BL_SUCCESS) {
-    assign_edges(work_data, job, &work_data->edge_storage);
+  BLPathView view = path->view();
+  bool split = job->has_job_flag(RenderJobFlags::kSplitFill);
+  if (split) {
+    const SplitFillRef* ref = job->split_fill_ref();
+    const SplitFillPart& part = ref->group->parts[ref->index];
+    view.vertex_data += part.begin.vertex_offset;
+    view.control_data_rev -= part.begin.control_offset;
+    view.vertex_count = part.end.vertex_offset - part.begin.vertex_offset;
+    view.control_data_size = part.end.control_offset - part.begin.control_offset;
   }
+
+  BLResult result = add_filled_path_edges(work_data, view, accessor.final_transform_fixed(job->origin_fixed()), accessor.final_transform_fixed_type());
+  if (split)
+    finish_split_fill(work_data, job, result);
+  else if (result == BL_SUCCESS)
+    assign_edges(work_data, job, &work_data->edge_storage);
 
   finalize_geometry_data(work_data, job);
 }
