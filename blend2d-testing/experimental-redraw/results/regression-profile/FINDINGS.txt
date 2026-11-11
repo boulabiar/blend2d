@@ -1,0 +1,84 @@
+Optimized Blend2D old/dev regression investigation
+2026-11-11
+
+Finding and correction
+
+The repeatable AntigenicShift regression came from a cutoff-accounting mistake in the dev port.
+The old path representation counted one vertex slot for each CLOSE command. Dev stores CLOSE
+in its reverse control stream and gives it no vertex. A path with 33,493 old entries became
+32,007 dev vertices, falling below the unchanged numeric split threshold of 32,768.
+The old renderer split this fill among geometry workers. The original dev port gave it to one worker.
+Per-job CPU profiling observed about 0.5 ms for that unsplit job. Other workers waited at the barrier.
+
+Fix 29183e147835e7fa37c6827664477414eb508554 restores CLOSE accounting in eligibility and partition sizes.
+The regression fixture includes the exact 32,007-vertex / 1,486-close boundary, plus a below-threshold case.
+It fails against the original dev-port library and passes against the correction.
+
+Clean counterfactual tests
+
+Each number is the median of three process medians. Every process has 3 rounds x 30 measured frames
+and 5 warmups per round. Same 2048x2048 redraw, cached stroke outlines, prepared setters, recorded batches.
+Parsing and retained preparation are outside timing. Every output matches its version reference pixels.
+
+Plan                      Old optimized   Dev before   Dev corrected  Old split disabled  Dev individual claims
+4t-local                         2.903024         3.144245         2.808517         3.161014         3.144650
+16t-physical                     1.587909         2.027757         1.665016         2.311427         2.162143
+16t-one-l3                       1.156216         1.592250         1.147276         1.595559         1.586205
+16t-bands2                       1.031311         1.424986         1.018991         1.424351         1.431345
+
+4t-local uses four physical cores in one L3 group.
+16t-physical permits migration within physical cores 0-15, spanning both L3 groups.
+16t-one-l3 uses eight physical cores plus their SMT siblings, CPUs 0-7,16-23.
+16t-bands2 uses two eight-thread owners, each restricted to its L3 group, queue 16384 per owner.
+Other plans use the default 10240 queue.
+
+Disabling splitting in old reproduces the loss. Individual job claims without restoring splitting
+leave the loss. These counterfactuals distinguish the cutoff problem from general atomic or barrier changes.
+
+Profiling evidence
+
+At 16T in one L3 group, the maximum worker-average geometry-barrier wait was approximately
+0.064 ms/frame on old, 0.564 ms/frame on the original dev port, and 0.064 ms/frame after the fix.
+These are instrumented measurements and include waiting for other geometry workers and wakeup.
+Before the correction, summed geometry CPU was 4.749 ms/frame old versus 4.163 ms/frame dev.
+Summed raster CPU was 10.537 versus 10.564 ms/frame. The loss was in elapsed waiting.
+
+At 1T, AntigenicShift produces 120039 edge vectors/295349 edge points on old and 116787/291450 on dev.
+The draw stream has 2624 commands and 478 cached-stroke jobs in both versions.
+Callgrind counts 3,433,671,703 instructions old versus3,490,511,157 dev over 25 loaded redraws, about+1.7%.
+Callgrind instrumentation starts after retained preparation and stops before pixel readback.
+The few additional instructions do not explain the large multithreaded latency increase.
+Linux perf counters are inaccessible (perf_event_paranoid=4), so this investigation makes no hardware
+cache-miss or coherence-counter claim. Native stage/job timers and clean counterfactual runs provide the cause.
+
+Pinning each worker to a distinct physical core
+
+An additional diagnostic pins worker IDs 0-15 to CPUs 0-15 before capture, preventing migration.
+These pinning changes exist in scratch diagnostic builds. The committed renderer change is cutoff accounting.
+
+Document                                                Old   Dev before   Dev corrected
+AntigenicShift_HiRes.svg                             1.087743     1.810756     1.110558
+PToT_hi-res_source_nobackground.svg                  0.729598     0.732222     0.733032
+tiger.svg                                            0.264869     0.269230     0.263100
+contour.svg                                          2.950258     2.822128     2.814508
+
+PToT and Tiger do not reproduce the large regressions in the earlier short, migration-permitted run.
+Contour 4T becomes faster on dev when limited to four cores in one L3 group.
+Small residual differences and some single-context cross-L3 timings remain sensitive to placement/frequency.
+CPU frequency and external system activity were not locked. All raw round/frame samples are retained.
+
+Correctness
+
+Release CTest 8/8 passed. Debug split-fill fixture passed. ASan native fixtures 3/3 passed
+with detect_leaks=0 because LeakSanitizer is incompatible with the execution tracing environment.
+All 16 supported documents match pre-fix dev pixels at 1T/4T/16T with one context and two owners.
+This corpus verification contains 32 processes and 1440 measured frames, plus warmups and capture.
+The investigation contains 120 repeat processes, 168 counterfactual processes and 36 pinned processes.
+All 324 timing processes were checked against version-specific reference pixels.
+
+Raw files and reproduction
+
+ROOT/out/dev-regression-profile/ contains repeat/,confirm/,pinned/,stages/,jobs/,after/,callgrind/,corpus-fixed/.
+ROOT is the rasterizer-wgpu checkout. confirm.py and pin_run.py reproduce the timing matrices with saved binaries.
+The sources/ and builds/ directories contain isolated profiling/counterfactual libraries. They are separate
+from the normal Blend2D checkouts. build.py/build_fixed.py/ablation_build.py/pin_build.py create diagnostic binaries.

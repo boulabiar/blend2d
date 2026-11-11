@@ -1,0 +1,12 @@
+Internal ctest changing into directory: /home/boulabiar/experiments/rendering/blend2d-dev-review/build/debug-asan
+Test project /home/boulabiar/experiments/rendering/blend2d-dev-review/build/debug-asan
+    Start 8: bl_review_render
+    Start 6: bl_review_equivalence
+    Start 7: bl_review_split_fill
+1/3 Test #7: bl_review_split_fill .............   Passed    3.18 sec
+2/3 Test #6: bl_review_equivalence ............   Passed    4.45 sec
+3/3 Test #8: bl_review_render .................   Passed    5.14 sec
+
+100% tests passed, 0 tests failed out of 3
+
+Total Test time (real) =   5.14 sec

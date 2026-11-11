@@ -1,0 +1,24 @@
+{
+  "old_revision": "44bf8af2866481306f59c04a3958d0c4207939f4",
+  "dev_before": "8013c53bb5749ed82c0787b0b815674bc233621d",
+  "fixed_revision": "29183e147835e7fa37c6827664477414eb508554",
+  "repeat_processes": 120,
+  "counterfactual_processes": 168,
+  "pinned_processes": 36,
+  "corpus_processes": 32,
+  "cpu_frequency": "unlocked, powersave governor",
+  "profilers": "Thread CPU/wall clocks, per-job CPU clocks, Callgrind. Hardware perf events denied.",
+  "binaries": {
+    "dev-fixed-pin": "d2dcae6ef8871d7b86f2ef6d50fb54a272f6801a15b51d07a5d453fd3b3ce7d0",
+    "dev-fixed-diag": "1f1ef92e324bd84ccef8e80967a9ea1b6b159ab85a7decafe75eae75cf4b89a5",
+    "dev-pin": "66d58c603281c43974d891aeb1ef250e798161ef1a713b0e8bd3bec782f755ae",
+    "dev-fixed": "0950425089776f83703049817e4ca49e30928f4267f6a17e3a7a46ea56518805",
+    "old-no-split": "3eaab4414b734e0e7053f3c8adc0728ce3a3c28b9b647b2f0d04f8687694a6d0",
+    "dev-claims1": "fe1fbc3ee631f8150275559c78767408d6862816bebc42afda41d67dde0edd8c",
+    "dev-symbols": "55366827de6bc194cc80f6984de4609635a5baf8d56856fda60a6aa0b2f05d89",
+    "old-diag": "7e4898ba925d125eab6daa2e65838151315e3e1c7260e7d885321f53f6fc499f",
+    "old-symbols": "2e558668e21e51f2e02d6ac78b3c53cb458430aba226ec878a7093ba7dd4dae7",
+    "old-pin": "603f431ef790388e262556e76273401ea41270ded00511b8eb3c9de5e753fe94",
+    "dev-diag": "75a895967ff2e75e44c71291f9fcbc95d051497f50ec2d6e585d0c86ba8dd46d"
+  }
+}

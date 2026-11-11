@@ -1,0 +1,85 @@
+Dev retained-redraw port
+
+Base revision
+  3645e2ebb3c420f09f48b3eeec12ad090325a046
+  Upstream dev, Cumulative changes - 2026
+
+Branch
+  review/dev-retained-redraw-16t
+
+Split cutoff correction
+
+The split-fill implementation preserves the 32768-entry splitting threshold.
+The legacy path size included CLOSE slots. Dev omits vertices for CLOSE.
+AntigenicShift has a fill that changed from 33493 old entries to 32007 dev
+vertices and consequently lost parallel preparation in the initial port.
+The correction counts closing commands when choosing eligibility and parts.
+The split-fill fixture checks this boundary and a below-threshold path.
+
+results/report.txt and its original CSV describe the initial port at 8013c53.
+results/regression-profile/FINDINGS.txt contains the subsequent profiles,
+counterfactual tests, per-worker pinning controls and corrected timings.
+
+Review history
+
+The cutoff correction is folded into the original split-fill commit
+50508ec, and its regression checks into the fixtures commit 9be953c.
+The branch contains no separate broken implementation and repair commits.
+Benchmark files retain their original measured revision IDs for provenance:
+8013c53 identifies the initial experimental port and 29183e1 the corrected
+code before this history cleanup. They are historical measurement IDs,
+not commits to apply to this branch. The corrected implementation and
+fixtures are unchanged by the cleanup. The original history is retained
+locally under backup/dev-retained-redraw-before-cleanup-20261111.
+
+The first three commits change ordinary geometry job scheduling, analytic
+bottom bounds, and splitting of large multi-contour fills. The remaining
+implementation commits provide private fixed-document experiments for
+band ownership, the asynchronous size threshold, packed exact stroke
+outlines, borrowed paths, and recorded command batches.
+
+The old object-type predicate fix is already covered by upstream's new
+object layer. The heap-outline and typed-color benchmark experiments
+were omitted from this port.
+
+Dev adaptations
+
+The fill splitter walks the vertex and reverse control streams together,
+including conic weights. Parts retain both offsets and merge into one
+analytic command, preserving the original fill rule and composition.
+Invalid paths use ordinary geometry processing. A failed partial producer
+prevents the group from publishing incomplete edges.
+
+Packed outlines retain the exact A/B/C sink output in both path streams.
+The native stroke sink and cache use the same edge submission helper.
+Borrowed jobs store an immutable BLPathCore pointer and do not retain
+or release that source. Recorded batches retain ordinary owned paths
+and styles until context teardown and regenerate edges on every replay.
+Recording allocations use Blend2D's allocator helpers.
+
+The private interfaces require fixed geometry, style, clip and viewport.
+Changes require rebuilding the retained context. Preparation and retained
+memory are additional costs of this redraw workload.
+
+Building and checking
+
+Check out the matching AsmJit dependency using the upstream instructions,
+then configure with the desired ASMJIT_DIR.
+
+  cmake --preset debug -DBLEND2D_EXPERIMENTAL_REDRAW_TEST=ON
+  cmake --build build/debug --parallel
+  ctest --test-dir build/debug --output-on-failure
+
+The experimental-redraw directory contains the native wrapper and three
+standalone pixel-equivalence fixtures. They link Blend2D directly.
+They cover conics, strokes, clips, gradients, images, affine transforms,
+large fills crossing geometry queues, repeated recorded split fills,
+borrowed paths and disjoint band owners.
+
+The results directory contains post-load redraw measurements and test
+summaries. The benchmark compares the same parsed input and cached public
+state setters at 2048x2048 on cores 0-15. Timings include clear, geometry
+generation, rasterization, compositing and the completion wait.
+Parsing, outline capture, command recording and readback occur outside
+the timed interval. The two-owner configuration uses an even row split
+and a queue limit of 16384 per owner.

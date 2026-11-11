@@ -1,0 +1,75 @@
+Historical initial-port measurements at 8013c53. See regression-profile/FINDINGS.txt for the corrected split-cutoff analysis and timings.
+
+Blend2D CPU post-load redraw comparison
+CPU affinity 0-15, 2048x2048, 3 rounds x 10 frames, 5 warmups per round
+Median wall milliseconds include clear, geometry work, rasterization and synchronous flush.
+Loading, retained preparation and pixel readback are outside the timed interval.
+Public replay uses the same cached state setters across library revisions.
+Retained variants use prebuilt stroke outlines and recorded command batches.
+Single-context variants use the default queue. Public 1T is synchronous. Retained 1T uses the queue on one thread.
+The optional port-bands2 uses two contexts at 4T/16T and a 16384-command queue per context, with an even row split.
+AsmJit 0464e1c8f1f43c861a0c73d4e59437fff255cdd9
+Harness 77c3f3b739a0905ac3c0b819314a5000d4805320
+stock-dev: 3645e2ebb3c420f09f48b3eeec12ad090325a046
+port-core: 8013c53bb5749ed82c0787b0b815674bc233621d
+port-retained: 8013c53bb5749ed82c0787b0b815674bc233621d
+port-bands2: 8013c53bb5749ed82c0787b0b815674bc233621d
+
+Document                                         Threads        stock-dev        port-core    port-retained      port-bands2  Changed pixels
+6000-DRG-01-M-001.pdf                                  1          216.203          213.509          116.975          117.600  none
+6000-DRG-01-M-001.pdf                                  4          107.174          127.964           50.134           49.770  none
+6000-DRG-01-M-001.pdf                                 16          124.519          115.110           40.278           26.044  none
+6d72bfe0d656d230b2761f6cc3be0fb128bfbaf1.pdf     skipped (unsupported features)
+Anime_Girl.svg                                         1            6.050            5.883            5.819            6.094  none
+Anime_Girl.svg                                         4            2.183            2.727            1.989            2.504  none
+Anime_Girl.svg                                        16            2.215            2.216            1.982            1.658  none
+AntigenicShift_HiRes.svg                               1           11.649           11.525           10.398           10.211  none
+AntigenicShift_HiRes.svg                               4            3.798            4.232            3.634            4.698  none
+AntigenicShift_HiRes.svg                              16            3.625            3.141            2.313            1.931  none
+Chrysler.pdf                                     skipped (unsupported features)
+Manchester_Union_Democrat_office_1877.svg              1           29.694           29.626           29.356           29.346  none
+Manchester_Union_Democrat_office_1877.svg              4           15.186            9.377            8.789           12.880  none
+Manchester_Union_Democrat_office_1877.svg             16           17.851            6.515            5.504            4.467  none
+PToT_hi-res_source_nobackground.svg                    1            8.810            8.693            8.264            8.362  none
+PToT_hi-res_source_nobackground.svg                    4            2.956            2.977            2.435            3.325  none
+PToT_hi-res_source_nobackground.svg                   16            2.988            2.467            1.578            0.984  none
+Paris 30K.pdf                                          1           81.030           79.654           75.284           80.740  none
+Paris 30K.pdf                                          4           31.427           29.837           19.887           22.631  none
+Paris 30K.pdf                                         16           28.938           24.130           12.411            7.130  none
+Strawberry.pdf                                   skipped (unsupported features)
+car.pdf                                                1           44.354           44.548           44.789           44.735  none
+car.pdf                                                4           11.465           11.998           11.377           13.682  none
+car.pdf                                               16            6.138            4.904            5.297            4.388  none
+contour.svg                                            1           28.586           30.005           21.802           22.230  none
+contour.svg                                            4            9.678           10.791            6.867           10.576  none
+contour.svg                                           16           13.459           10.948            5.548            3.188  none
+designcloud.pdf                                        1           97.819           98.718           92.629           94.578  none
+designcloud.pdf                                        4           46.208           44.826           26.032           28.071  none
+designcloud.pdf                                       16           42.791           35.657           13.615            8.776  none
+drops.pdf                                              1           46.713           46.835           45.695           45.828  none
+drops.pdf                                              4           11.563           11.489           11.718           15.590  none
+drops.pdf                                             16            5.779            5.767            6.155            4.531  none
+embrace.pdf                                            1           40.612           40.698           39.979           40.088  none
+embrace.pdf                                            4           10.112           10.505           10.006           13.996  none
+embrace.pdf                                           16            5.220            6.788            4.921            3.600  none
+hawaii.svg                                             1           11.510           11.661           10.692           10.607  none
+hawaii.svg                                             4            4.034            4.133            3.275            4.935  none
+hawaii.svg                                            16            3.353            2.876            2.782            1.495  none
+london-rail-and-tube-services-map.pdf            skipped (unsupported features)
+pathological.pdf                                       1          283.990          300.678          182.741          183.789  none
+pathological.pdf                                       4          117.780          104.111           67.535           77.234  none
+pathological.pdf                                      16          146.934          119.316           47.673           30.523  none
+reschart.svg                                           1            1.088            1.044            0.975            0.934  none
+reschart.svg                                           4            0.460            0.285            0.260            0.257  none
+reschart.svg                                          16            0.409            0.286            0.292            0.137  none
+spoorkaart_prorail_april_2013.pdf                      1          173.349          174.244          138.343          140.430  none
+spoorkaart_prorail_april_2013.pdf                      4           67.868           65.659           41.024           44.673  none
+spoorkaart_prorail_april_2013.pdf                     16           58.774           48.542           25.905           14.605  none
+tiger.svg                                              1            3.687            3.760            3.518            3.554  none
+tiger.svg                                              4            1.006            1.001            1.266            1.381  none
+tiger.svg                                             16            0.939            0.849            0.667            0.476  none
+
+Geometric mean speedup versus stock-dev (greater than 1 is faster)
+port-core  1T 0.998x  4T 1.031x  16T 1.204x
+port-retained  1T 1.145x  4T 1.335x  16T 1.792x
+port-bands2  1T 1.135x  4T 1.085x  16T 2.701x

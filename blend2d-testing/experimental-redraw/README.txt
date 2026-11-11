@@ -5,6 +5,14 @@ Run ctest from the build directory. The three review fixtures compare
 synchronous rendering with threaded rendering, signed packed stroke outlines,
 borrowed paths, repeated recorded batches, and independent band owners.
 The split-fill fixture includes conic controls and multiple merge groups.
+It also verifies the legacy entry cutoff for paths whose CLOSE commands
+have no vertices in the new representation, with exact pixels on both sides
+of the threshold.
+
+For a short create/replay/destroy lifetime loop, run bl_review_equivalence
+with --lifetime from the build's experimental-redraw directory.
+The recorded Valgrind check uses GLIBC_TUNABLES=glibc.pthread.stack_cache_size=0
+to release the libc stack cache before inspecting process exit.
 
 The native benchmark wrapper accepts the same input record as the earlier
 review. BLEND_PROBE_PRESTROKE=6 enables exact packed A/B/C stroke outlines.

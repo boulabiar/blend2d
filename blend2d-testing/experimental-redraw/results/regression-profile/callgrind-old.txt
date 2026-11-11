@@ -1,0 +1,31 @@
+--------------------------------------------------------------------------------
+Profile data file 'rasterizer-wgpu/out/dev-regression-profile/callgrind/old/callgrind.out' (creator: callgrind-3.25.1)
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 0 - 285854683
+Trigger: Program termination
+Profiled target:  out/dev-regression-profile/bin/old-symbols vendor/Rasterizer/TestFiles/AntigenicShift_HiRes.svg out/dev-regression-profile/callgrind/old/run 2048 20 1 (PID 14, part 1)
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       95
+Include dirs:     
+User annotated:   
+Auto-annotation:  off
+
+--------------------------------------------------------------------------------
+Ir                     
+--------------------------------------------------------------------------------
+3,433,671,703 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                      file:function
+--------------------------------------------------------------------------------
+1,667,192,000 (48.55%)  ???:bl::RasterEngine::WorkerProc::process_work_data(bl::RasterEngine::WorkData*, bl::RasterEngine::RenderBatch*) [/home/boulabiar/experiments/rendering/rasterizer-wgpu/out/dev-regression-profile/bin/old-symbols]
+  781,329,575 (22.75%)  ???:bl::RasterEngine::EdgeBuilder<int>::_add_path_scale(BLPathView, bool, BLMatrix2D const&) [/home/boulabiar/experiments/rendering/rasterizer-wgpu/out/dev-regression-profile/bin/old-symbols]
+  373,512,650 (10.88%)  ???:0x0000000006d45e40 [???]
+  314,305,975 ( 9.15%)  ???:0x0000000006d455c0 [???]
+  197,998,375 ( 5.77%)  ???:bl::RasterEngine::EdgeBuilder<int>::_addReversePathFromStrokeSinkScale(BLPathView, BLMatrix2D const&) [/home/boulabiar/experiments/rendering/rasterizer-wgpu/out/dev-regression-profile/bin/old-symbols]
+

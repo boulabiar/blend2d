@@ -1,0 +1,13 @@
+Blend2D source verification
+  package: /home/boulabiar/experiments/rendering/blend2d-dev-review/blend2d
+  scanned: 409 files (225 headers, 184 sources)
+
+EMPTY FILES (1) - skipped
+  blend2d/core/geometry_p.h
+
+SUMMARY
+  license issues: 0 file(s)
+  guard issues:   0 file(s)
+  empty files:    1
+  clean:          408 file(s)
+  result:         OK

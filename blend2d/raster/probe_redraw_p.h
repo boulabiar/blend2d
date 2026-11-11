@@ -1,3 +1,8 @@
+// This file is part of Blend2D project <https://blend2d.com>
+//
+// See blend2d.h or LICENSE.md for license and copyright information
+// SPDX-License-Identifier: Zlib
+
 // Experimental fixed-document redraw hooks for the native benchmark.
 #ifndef BLEND2D_RASTER_PROBE_REDRAW_P_H_INCLUDED
 #define BLEND2D_RASTER_PROBE_REDRAW_P_H_INCLUDED

@@ -111,8 +111,26 @@ static std::vector<unsigned char> test_render(int size, unsigned seed, Variant v
   bb_free(bench);
   return first;
 }
-int main() {
+int main(int argc, char** argv) {
   Variant reference = {"sync", 0, 0, 0, -1, false};
+  if (argc == 2 && std::strcmp(argv[1], "--lifetime") == 0) {
+    auto expected = test_render(128, 1, reference);
+    Variant lifetime_variants[] = {
+        {"record", 4, 0, 0, -1, true, 0, true},
+        {"packed-record", 4, 0, 6, -1, true, 0, true},
+        {"borrowed", 4, 0, 0, -1, true, 2, false}};
+    for (int repeat = 0; repeat < 3; repeat++) {
+      for (Variant variant : lifetime_variants) {
+        if (test_render(128, 1, variant) != expected)
+          return 1;
+      }
+    }
+    check(bl_runtime_cleanup(BL_RUNTIME_CLEANUP_EVERYTHING));
+    // Cleanup requests detached worker shutdown. Allow pthread TLS destructors
+    // to finish before an external leak checker inspects process exit.
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    return 0;
+  }
   Variant variants[] = {{"cached4", 4, 0, 0, -1, false},
                         {"cached16", 16, 0, 0, -1, false},
                         {"prepared", 16, 0, 0, -1, true},
@@ -144,4 +162,5 @@ int main() {
       }
       std::printf("Exact replay: size=%d seed=%u, all variants; two redraws each\n", size, seed);
     }
+  return 0;
 }

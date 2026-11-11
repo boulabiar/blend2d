@@ -1,0 +1,2 @@
+Original dev-port library 8013c53, new cutoff fixture. Exit -6
+Split cutoff changed units: vertices=32007 closes=1486 split=0

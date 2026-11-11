@@ -1,0 +1,22 @@
+Internal ctest changing into directory: /home/boulabiar/experiments/rendering/blend2d-dev-review/build/release
+Test project /home/boulabiar/experiments/rendering/blend2d-dev-review/build/release
+    Start 1: bl_test_runner
+    Start 5: bl_test_context_jit
+    Start 4: bl_test_context_mt
+    Start 6: bl_review_equivalence
+1/8 Test #6: bl_review_equivalence ............   Passed    0.73 sec
+    Start 3: bl_test_context_simple
+2/8 Test #4: bl_test_context_mt ...............   Passed    0.88 sec
+    Start 2: bl_test_allocation_strategy
+3/8 Test #2: bl_test_allocation_strategy ......   Passed    0.42 sec
+    Start 8: bl_review_render
+4/8 Test #3: bl_test_context_simple ...........   Passed    0.59 sec
+    Start 7: bl_review_split_fill
+5/8 Test #7: bl_review_split_fill .............   Passed    0.24 sec
+6/8 Test #8: bl_review_render .................   Passed    0.30 sec
+7/8 Test #5: bl_test_context_jit ..............   Passed   22.30 sec
+8/8 Test #1: bl_test_runner ...................   Passed   23.19 sec
+
+100% tests passed, 0 tests failed out of 8
+
+Total Test time (real) =  23.19 sec
