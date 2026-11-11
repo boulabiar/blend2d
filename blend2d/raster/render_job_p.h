@@ -11,6 +11,7 @@
 #include <blend2d/geometry/commons_p.h>
 #include <blend2d/pipeline/pipe_defs_p.h>
 #include <blend2d/raster/edge_builder_p.h>
+#include <blend2d/raster/probe_redraw_p.h>
 #include <blend2d/raster/render_batch_p.h>
 #include <blend2d/raster/render_command_p.h>
 #include <blend2d/raster/raster_defs_p.h>
@@ -39,7 +40,8 @@ enum class RenderJobFlags : uint8_t {
   kNone = 0u,
 
   kComputePendingFetchData = 0x01u,
-  kSplitFill = 0x02u
+  kSplitFill = 0x02u,
+  kPackedStroke = 0x08u
 };
 BL_DEFINE_ENUM_FLAGS(RenderJobFlags)
 
@@ -142,6 +144,12 @@ struct SplitFillGroup {
 struct SplitFillRef {
   SplitFillGroup* group;
   uint32_t index;
+};
+
+struct ProbePackedRef {
+  const ProbePackedView* view;
+  uint32_t first;
+  uint32_t count;
 };
 
 struct alignas(BLPathCore) RenderJob_GeometryOp : public RenderJob_BaseOp {

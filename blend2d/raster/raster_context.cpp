@@ -2478,7 +2478,8 @@ static BL_INLINE BLResult enqueue_command(
 // Split only at MOVE boundaries: partial edge generation preserves the fill's
 // contour closure, while all edges are combined before the single draw executes.
 static bool try_enqueue_split_fill(WorkerManager& mgr, RenderJob_GeometryOp* source) noexcept {
-  if (source->geometry_type() != BL_GEOMETRY_TYPE_PATH_D || mgr.thread_count() == 0)
+  if (source->has_job_flag(RenderJobFlags::kPackedStroke) ||
+      source->geometry_type() != BL_GEOMETRY_TYPE_PATH_D || mgr.thread_count() == 0)
     return false;
 
   const BLPath* path = source->geometry_data<BLPath>();
@@ -4866,4 +4867,42 @@ extern "C" BLResult bl_probe_set_async_path_limit(BLContextCore* self, uint32_t 
     return BL_ERROR_INVALID_STATE;
   ctx->worker_mgr()._probe_async_path_limit = byte_limit;
   return BL_SUCCESS;
+}
+
+namespace bl::RasterEngine {
+
+static BLResult probe_stroke_packed(RasterContextImpl* ctx_impl, const ProbePackedRef& outline,
+                                   const BLObjectCore* style) noexcept {
+  constexpr RenderingMode kRM = kAsync;
+  BLResult bail_result = BL_SUCCESS;
+  BL_CONTEXT_RESOLVE_EXPLICIT_STYLE_OP(ContextFlags::kNoStrokeOpExplicit, BL_CONTEXT_STYLE_SLOT_STROKE, style, kNoBail);
+
+  di.add_fill_type(Pipeline::FillType::kAnalytic);
+  RenderCommand* command = ctx_impl->worker_mgr().current_command();
+  command->init_command(di.alpha);
+  command->init_fill_analytic(nullptr, 0, BL_FILL_RULE_NON_ZERO);
+
+  const BLMatrix2D& transform = ctx_impl->final_transform_fixed();
+  BLPoint origin_fixed(transform.m20, transform.m21);
+  constexpr size_t job_size = axl::align_up(sizeof(RenderJob_GeometryOp) + sizeof(ProbePackedRef), kWorkerAllocatorAlignment);
+  BLResult result = enqueue_command_with_fill_job<RenderJob_GeometryOp>(ctx_impl, di, ds, job_size, origin_fixed,
+    [&](RenderJob_GeometryOp* job) noexcept {
+      *job->geometry_data<ProbePackedRef>() = outline;
+      job->add_job_flags(RenderJobFlags::kPackedStroke);
+    });
+  return finalize_explicit_op<kAsync>(ctx_impl, fetch_data.ptr(), result);
+}
+
+} // {bl::RasterEngine}
+
+extern "C" BLResult bl_probe_stroke_packed(BLContextCore* self, const bl::RasterEngine::ProbePackedView* view,
+                                          uint32_t first, uint32_t count, const BLObjectCore* style) noexcept {
+  auto* ctx = probe_async_context(self);
+  if (!ctx)
+    return BL_ERROR_INVALID_STATE;
+  if (!view || !style || first > view->count || count > view->count - first)
+    return BL_ERROR_INVALID_VALUE;
+  if (!count)
+    return BL_SUCCESS;
+  return bl::RasterEngine::probe_stroke_packed(ctx, {view, first, count}, style);
 }

@@ -55,6 +55,19 @@ struct StrokeSink : public EdgeBuilderSink {
   BLTransformType transform_type;
 };
 
+static BL_INLINE BLResult add_stroke_outline_edges(EdgeBuilder<int>& builder, const BLPathView& a,
+                                                  const BLPathView& b, const BLPathView& c,
+                                                  const BLMatrix2D& transform, BLTransformType type) noexcept {
+  BL_PROPAGATE(builder.add_path(a, false, transform, type));
+  BL_PROPAGATE(builder.flip_master_sign());
+  BL_PROPAGATE(builder.add_path(b, false, transform, type));
+  BL_PROPAGATE(builder.flip_master_sign());
+
+  if (c.control_data_size)
+    return builder.add_path(c, false, transform, type);
+  return BL_SUCCESS;
+}
+
 struct StrokeGlyphRunSink : public StrokeSink {
   BLPath* paths;
   const BLStrokeOptions* stroke_options;

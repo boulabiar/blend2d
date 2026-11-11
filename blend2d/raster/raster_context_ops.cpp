@@ -62,17 +62,8 @@ BLResult stroke_geometry_sink(BLPathCore* a, BLPathCore* b, BLPathCore* c, const
   axl::maybe_unused(input_region);
 
   StrokeSink* self = static_cast<StrokeSink*>(user_data);
-  EdgeBuilder<int>* edge_builder = self->edge_builder;
-
-  BL_PROPAGATE(edge_builder->add_path(a->dcast().view(), false, *self->transform, self->transform_type));
-
-  BL_PROPAGATE(edge_builder->flip_master_sign());
-  BL_PROPAGATE(edge_builder->add_path(b->dcast().view(), false, *self->transform, self->transform_type));
-  BL_PROPAGATE(edge_builder->flip_master_sign());
-
-  if (!c->dcast().is_empty()) {
-    BL_PROPAGATE(edge_builder->add_path(c->dcast().view(), false, *self->transform, self->transform_type));
-  }
+  BL_PROPAGATE(add_stroke_outline_edges(*self->edge_builder, a->dcast().view(), b->dcast().view(),
+                                        c->dcast().view(), *self->transform, self->transform_type));
 
   return a->dcast().clear();
 }

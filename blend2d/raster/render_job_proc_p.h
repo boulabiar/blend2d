@@ -170,7 +170,45 @@ static void finish_split_fill(WorkData* work_data, RenderJob_GeometryOp* job, BL
 // RasterEngine - Job Processor - Fill Geometry Job
 // ================================================
 
+static void process_packed_stroke(WorkData* work_data, RenderJob_GeometryOp* job) noexcept {
+  const ProbePackedRef& ref = *job->geometry_data<ProbePackedRef>();
+  const ProbePackedView& view = *ref.view;
+  JobStateAccessor accessor(job);
+  prepare_edge_builder(work_data, accessor.fill_state());
+  EdgeBuilder<int>& builder = work_data->edge_builder;
+  BLMatrix2D transform = accessor.final_transform_fixed(job->origin_fixed());
+  BLTransformType type = accessor.final_transform_fixed_type();
+
+  auto path_view = [&](const ProbePackedSpan& span) noexcept -> BLPathView {
+    return {view.vertices + span.vertex_offset, view.controls + span.control_offset + span.control_size,
+            span.vertex_count, span.control_size};
+  };
+
+  builder.begin();
+  BLResult result = BL_SUCCESS;
+  for (uint32_t i = 0; i < ref.count; i++) {
+    const ProbePackedPart& part = view.parts[size_t(ref.first) + i];
+    result = add_stroke_outline_edges(builder, path_view(part.a), path_view(part.b), path_view(part.c), transform, type);
+    if (result != BL_SUCCESS)
+      break;
+  }
+  if (result == BL_SUCCESS)
+    result = builder.done();
+  if (result == BL_SUCCESS) {
+    assign_edges(work_data, job, &work_data->edge_storage);
+  }
+  else {
+    work_data->revert_edge_builder();
+    work_data->accumulate_error(result);
+  }
+}
+
 static void process_fill_geometry_job(WorkData* work_data, RenderJob_GeometryOp* job) noexcept {
+  if (job->has_job_flag(RenderJobFlags::kPackedStroke)) {
+    process_packed_stroke(work_data, job);
+    return;
+  }
+
   BLPath* path = get_geometry_as_path(work_data, job);
   if (BL_UNLIKELY(!path))
     return;
