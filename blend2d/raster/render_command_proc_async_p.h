@@ -238,6 +238,10 @@ static CommandStatus fill_box_mask_a(ProcData& proc_data, const RenderCommand& c
 }
 
 static CommandStatus fill_analytic(ProcData& proc_data, const RenderCommand& command, int32_t prev_band_fy1, int32_t next_band_fy0) noexcept {
+  // The command cannot cover this or any later band.
+  if (command._payload.analytic.fixed_y1 <= int32_t(proc_data.band_fixed_y0()))
+    return CommandStatus::kDone;
+
   // Rasterizer options to use - do not change unless you are improving the existing rasterizers.
   constexpr uint32_t kRasterizerOptions =
     AnalyticRasterizer::kOptionBandOffset     |
