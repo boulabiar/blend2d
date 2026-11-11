@@ -1048,6 +1048,7 @@ struct ProbeRecordedFrame {
   ProbeRecordedBatch* last = nullptr;
   BLResult error = BL_SUCCESS;
   bool capturing = true;
+  bool retain_edges = false;
 };
 
 template<typename Func>
@@ -1151,6 +1152,40 @@ static void reset_recorded_batch(RenderBatch* batch) noexcept {
   });
 }
 
+// Flattened edges are read-only during rasterization. Copy them from the worker
+// arenas into the recorded arena, then replay the batch without geometry jobs.
+// On allocation failure the batch keeps its jobs, which rebuild every edge list.
+static void retain_recorded_edges(ArenaAllocator& arena, RenderBatch* batch) noexcept {
+  RenderCommandQueue* last = batch->_command_list.last();
+  for (RenderCommandQueue* queue = batch->_command_list.first();; queue = queue->next()) {
+    for (size_t i = 0; i < queue->size(); i++) {
+      RenderCommand& command = queue->at(i);
+      if (!command.is_fill_analytic())
+        continue;
+
+      const EdgeVector<int>* source = command.analytic_edges();
+      EdgeVector<int>* first = nullptr;
+      EdgeVector<int>** link = &first;
+      while (source) {
+        size_t size = sizeof(EdgeVector<int>) - sizeof(EdgePoint<int>) + source->count() * sizeof(EdgePoint<int>);
+        auto* copy = static_cast<EdgeVector<int>*>(arena.alloc(axl::align_up(size, alignof(EdgeVector<int>)), alignof(EdgeVector<int>)));
+        if (!copy)
+          return;
+        memcpy(copy, source, size);
+        *link = copy;
+        link = &copy->next;
+        source = source->next;
+      }
+      *link = nullptr;
+      command._payload.analytic.edges.ptr = first;
+    }
+    if (queue == last)
+      break;
+  }
+  batch->_job_count = 0;
+  batch->_has_split_fill = 0;
+}
+
 static BL_INLINE void run_render_batch(RasterContextImpl* ctx_impl, WorkerManager& mgr, RenderBatch* batch) noexcept {
   WorkerSynchronization* synchronization = &mgr._synchronization;
   uint32_t thread_count = mgr.thread_count();
@@ -1209,6 +1244,8 @@ static BL_NOINLINE BLResult flush_render_batch(RasterContextImpl* ctx_impl) noex
     run_render_batch(ctx_impl, mgr, batch);
 
     if (recording) {
+      if (frame->retain_edges)
+        retain_recorded_edges(mgr._allocator, batch);
       recording->batch = batch;
       mgr._allocator.swap(recording->arena);
       if (frame->last)
@@ -5107,6 +5144,18 @@ extern "C" BLResult bl_probe_record_begin(BLContextCore* self) noexcept {
     return BL_ERROR_OUT_OF_MEMORY;
   mgr._probe_record = new (storage) bl::RasterEngine::ProbeRecordedFrame();
   mgr._probe_async_path_limit = 0;
+  return BL_SUCCESS;
+}
+
+extern "C" BLResult bl_probe_record_retain_edges(BLContextCore* self) noexcept {
+  auto* ctx = probe_async_context(self);
+  if (!ctx)
+    return BL_ERROR_INVALID_STATE;
+  auto* frame = ctx->worker_mgr()._probe_record;
+  if (!frame || !frame->capturing)
+    return BL_ERROR_INVALID_STATE;
+
+  frame->retain_edges = true;
   return BL_SUCCESS;
 }
 

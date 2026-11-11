@@ -9,6 +9,7 @@ struct Variant {
   unsigned borrow = 0;
   bool record = false;
   unsigned cut = 0;
+  bool retain = false;
 };
 static unsigned random_u(unsigned &s) {
   s ^= s << 13;
@@ -27,6 +28,9 @@ static std::vector<unsigned char> test_render(int size, unsigned seed, Variant v
   unsetenv("BLEND_PROBE_RECORD");
   if (variant.record)
     setenv("BLEND_PROBE_RECORD", "1", 1);
+  unsetenv("BLEND_PROBE_RETAIN_EDGES");
+  if (variant.retain)
+    setenv("BLEND_PROBE_RETAIN_EDGES", "1", 1);
   unsetenv("BLEND_PROBE_PREPARED");
   unsetenv("BLEND_PROBE_ASYNC_LIMIT");
   number_env("BLEND_PROBE_BORROW", variant.borrow);
@@ -162,6 +166,7 @@ int main(int argc, char** argv) {
     Variant lifetime_variants[] = {
         {"record", 4, 0, 0, -1, true, 0, true},
         {"packed-record", 4, 0, 6, -1, true, 0, true},
+        {"packed-record-retain", 4, 0, 6, -1, true, 0, true, 0, true},
         {"borrowed", 4, 0, 0, -1, true, 2, false}};
     for (int repeat = 0; repeat < 3; repeat++) {
       for (Variant variant : lifetime_variants) {
@@ -190,7 +195,11 @@ int main(int argc, char** argv) {
                         {"record-bands2", 16, 2, 0, -1, true, 0, true},
                         {"record-packed", 16, 0, 6, -1, true, 0, true},
                         {"record-packed-bands2", 16, 2, 6, -1, true, 0, true},
-                        {"record-packed-cut", 16, 2, 6, -1, true, 0, true, 1280}};
+                        {"record-packed-cut", 16, 2, 6, -1, true, 0, true, 1280},
+                        {"record-retain", 16, 0, 0, -1, true, 0, true, 0, true},
+                        {"record-retain-bands2", 16, 2, 0, -1, true, 0, true, 0, true},
+                        {"record-packed-retain", 16, 0, 6, -1, true, 0, true, 0, true},
+                        {"record-packed-retain-cut", 16, 2, 6, -1, true, 0, true, 1280, true}};
   test_unrecordable_batch();
   for (int size : {128, 257, 321, 2048})
     for (unsigned seed : {1u, 987654321u}) {

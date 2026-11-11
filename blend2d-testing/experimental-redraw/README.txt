@@ -18,6 +18,9 @@ The native benchmark wrapper accepts the same input record as the earlier
 review. BLEND_PROBE_PRESTROKE=6 enables exact packed A/B/C stroke outlines.
 BLEND_PROBE_PREPARED=1 precomputes state-change flags.
 BLEND_PROBE_RECORD=1 records commands during bb_prepare().
+BLEND_PROBE_RETAIN_EDGES=1 also keeps the recorded batches' edges, so
+replays rasterize without geometry jobs. This costs retained edge memory
+and is outside the regenerate-every-frame rule of the earlier measurements.
 BLEND_PROBE_BORROW=1 borrows strokes and 2 also borrows small fill paths.
 BLEND_PROBE_TILES=2 or 4 creates disjoint raster-band owners. Each owner
 uses its share of the requested thread count. Queue limits apply per owner.

@@ -39,6 +39,9 @@ extern "C" BLResult bl_probe_geometry_borrowed(BLContextCore* self, const BLPath
                                                uint32_t stroke, const BLObjectCore* style) noexcept;
 
 extern "C" BLResult bl_probe_record_begin(BLContextCore* self) noexcept;
+// Call between begin and end. Later recorded batches keep their generated edges
+// and replay without geometry jobs. A batch that cannot copy its edges keeps its jobs.
+extern "C" BLResult bl_probe_record_retain_edges(BLContextCore* self) noexcept;
 extern "C" BLResult bl_probe_record_end(BLContextCore* self) noexcept;
 extern "C" BLResult bl_probe_record_replay(BLContextCore* self) noexcept;
 extern "C" BLResult bl_probe_set_band_range(BLContextCore* self, uint32_t y0, uint32_t y1) noexcept;

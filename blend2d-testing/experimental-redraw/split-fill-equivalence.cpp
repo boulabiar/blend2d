@@ -87,7 +87,8 @@ static std::vector<unsigned char> render_cutoff_case(unsigned threads, size_t ve
   return pixels;
 }
 
-static std::vector<unsigned char> render(unsigned threads, unsigned scene, bool record = false) {
+// record: 0 draws directly, 1 replays recorded jobs, 2 replays retained edges.
+static std::vector<unsigned char> render(unsigned threads, unsigned scene, int record = 0) {
   BLImage image;
   ok(image.create(321, 289, BL_FORMAT_PRGB32));
   BLContext context;
@@ -97,6 +98,8 @@ static std::vector<unsigned char> render(unsigned threads, unsigned scene, bool 
   ok(context.begin(image, &info));
   if (record)
     ok(bl_probe_record_begin(&context));
+  if (record == 2)
+    ok(bl_probe_record_retain_edges(&context));
   ok(context.set_comp_op(BL_COMP_OP_SRC_COPY));
   ok(context.fill_all(BLRgba32(0xffffffff)));
   ok(context.set_comp_op(BL_COMP_OP_SRC_OVER));
@@ -161,7 +164,7 @@ int main(int argc, char **argv) {
         return 1;
       }
     }
-    if (render(16, scene, true) != reference) {
+    if (render(16, scene, 1) != reference || render(16, scene, 2) != reference) {
       std::fprintf(stderr, "Recorded split fill differs in scene %u\n", scene);
       return 1;
     }

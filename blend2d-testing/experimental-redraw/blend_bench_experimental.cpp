@@ -361,6 +361,8 @@ static void render_cached_dispatch(Bench *bench) {
     return;
   }
   check(bl_probe_record_begin(&bench->context));
+  if (const char *retain = std::getenv("BLEND_PROBE_RETAIN_EDGES"); retain && std::strcmp(retain, "1") == 0)
+    check(bl_probe_record_retain_edges(&bench->context));
   render_cached_unrecorded(bench);
   check(bl_probe_record_end(&bench->context));
   bench->record_ready = true;
